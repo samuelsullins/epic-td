@@ -208,8 +208,8 @@ export const TOWERS: Record<TowerKind, TowerDef> = {
     desc: 'Volleys of tiny homing missiles. Beautiful chaos.',
     levels: [
       { cost: 150, hp: 280, range: 170, damage: 11, cooldown: 1.6, volley: 6 },
-      { cost: 110, hp: 340, range: 180, damage: 13, cooldown: 1.45, volley: 8 },
-      { cost: 190, hp: 400, range: 195, damage: 16, cooldown: 1.35, volley: 10 },
+      { cost: 110, hp: 340, range: 180, damage: 13, cooldown: 1.0, volley: 8 },
+      { cost: 190, hp: 400, range: 195, damage: 16, cooldown: 0.45, volley: 10 },
     ],
   },
   sprayer: {
