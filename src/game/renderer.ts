@@ -211,9 +211,41 @@ export class Renderer {
     b.roundRect(bp.x - 58, bp.y - 58, 116, 116, 10).fill({ color: PAPER });
     sk.rect(b, bp.x - 58, bp.y - 58, 116, 116, { color: INK, width: 3, jitter: 1.8, overshoot: 6 });
     sk.rect(b, bp.x - 42, bp.y - 42, 84, 84, { color: INK_LIGHT, width: 2, jitter: 1.4, overshoot: 3 });
-    drawHeart(b, bp.x, bp.y, 2.7, RED);
 
     this.boardLayer.addChild(b);
+
+    // the actual icon-set heart (lucide), centered on the plinth
+    const heart = new Sprite(this.heartTexture());
+    heart.anchor.set(0.5);
+    heart.position.set(bp.x, bp.y);
+    heart.width = 64;
+    heart.height = 64;
+    this.boardLayer.addChild(heart);
+  }
+
+  /** lucide `heart` path rendered through Path2D — pixel-faithful to the icon set */
+  private heartTexture(): Texture {
+    let t = this.tex.get('heart');
+    if (!t) {
+      const cv = document.createElement('canvas');
+      const S = 8;
+      cv.width = 24 * S;
+      cv.height = 24 * S;
+      const c = cv.getContext('2d')!;
+      c.scale(S, S);
+      c.fillStyle = '#d24a43';
+      c.strokeStyle = '#9b2f2a';
+      c.lineWidth = 1.4;
+      c.lineJoin = 'round';
+      const path = new Path2D(
+        'M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z',
+      );
+      c.fill(path);
+      c.stroke(path);
+      t = Texture.from(cv);
+      this.tex.set('heart', t);
+    }
+    return t;
   }
 
   // ---------------- procedural textures ----------------
@@ -1036,15 +1068,6 @@ function easeOutBack(t: number): number {
   const c1 = 1.70158;
   const c3 = c1 + 1;
   return 1 + c3 * (t - 1) ** 3 + c1 * (t - 1) ** 2;
-}
-
-/** the heart from the icon set (lucide geometry: two lobes + point), centered on (x, y) */
-function drawHeart(g: Graphics, cx: number, cy: number, s: number, color: number) {
-  const x = (u: number) => cx + (u - 12) * s;
-  const y = (v: number) => cy + (v - 12.5) * s;
-  g.circle(x(7.5), y(8.5), 5.5 * s).fill(color);
-  g.circle(x(16.5), y(8.5), 5.5 * s).fill(color);
-  g.poly([x(2.6), y(10.8), x(12), y(21), x(21.4), y(10.8), x(12), y(8)]).fill(color);
 }
 
 /** dashed wobbly line */

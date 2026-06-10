@@ -557,7 +557,7 @@ export class Sim {
       if (distance(home.pos, p.pos) < 14) {
         p.dead = true;
         home.dronesOut = Math.max(0, home.dronesOut - 1);
-        home.rechargeT = Math.max(home.rechargeT, 0.9);
+        home.rechargeT = Math.max(home.rechargeT, 0.6);
       }
     }
     p.pos = { x: p.pos.x + p.vel.x * dt, y: p.pos.y + p.vel.y * dt };
