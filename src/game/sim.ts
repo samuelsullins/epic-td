@@ -1,9 +1,9 @@
 import {
-  ABILITIES, SLOTS, SPAWN_INTERVAL, TOWERS, TOWER_LEVEL_VULN, UNITS,
+  SLOTS, SPAWN_INTERVAL, TOWERS, TOWER_LEVEL_VULN, UNITS,
 } from './config';
 import { PATH_LENGTH, distance, pointAt } from './path';
 import type {
-  AbilityKind, Projectile, SimEvent, Tank, Tower, TowerKind, UnitKind, Vec,
+  Projectile, SimEvent, Tank, Tower, TowerKind, UnitKind, Vec,
 } from './types';
 
 const DT = 1 / 60;
@@ -20,10 +20,6 @@ export class Sim {
   waveQueue: UnitKind[] = [];
   spawnTimer = 0;
   waveActive = false;
-
-  // attacker ability state
-  overdriveT = 0;
-  jammerT = 0;
 
   private acc = 0;
   private spawnLater: Tank[] = []; // splitter mites born mid-iteration
@@ -87,8 +83,6 @@ export class Sim {
     this.waveQueue = [...units];
     this.spawnTimer = 0.3;
     this.waveActive = true;
-    this.overdriveT = 0;
-    this.jammerT = 0;
     this.clearOrdnance();
   }
 
@@ -97,21 +91,6 @@ export class Sim {
   private clearOrdnance() {
     this.projectiles = [];
     for (const t of this.towers) { t.dronesOut = 0; t.rechargeT = 0; }
-  }
-
-  triggerAbility(kind: AbilityKind) {
-    const def = ABILITIES[kind];
-    if (kind === 'overdrive') this.overdriveT = def.duration;
-    if (kind === 'jammer') this.jammerT = def.duration;
-    if (kind === 'patch') {
-      for (const tank of this.tanks) {
-        if (!tank.dead) {
-          tank.hp = Math.min(tank.maxHp, tank.hp + tank.maxHp * 0.25);
-          tank.flash = 0.25;
-        }
-      }
-    }
-    this.events.push({ type: 'sfx', name: `ability_${kind}` });
   }
 
   get waveDone(): boolean {
@@ -136,9 +115,6 @@ export class Sim {
       for (const t of this.towers) t.recoil = Math.max(0, t.recoil - dt * 4);
       return;
     }
-
-    this.overdriveT = Math.max(0, this.overdriveT - dt);
-    this.jammerT = Math.max(0, this.jammerT - dt);
 
     // spawn (first unit added to the wave rolls out first)
     if (this.waveQueue.length > 0) {
@@ -207,8 +183,7 @@ export class Sim {
         tank.ghosted = tank.phaseT >= def.phase.visibleT;
       }
 
-      let speed = def.speed * tank.slow.mult;
-      if (this.overdriveT > 0) speed *= 1.45;
+      const speed = def.speed * tank.slow.mult;
       tank.dist += speed * dt;
 
       const p = pointAt(tank.dist);
@@ -382,9 +357,7 @@ export class Sim {
         continue;
       }
 
-      let rate = 1;
-      if (tw.suppressT > 0) rate *= 0.4;
-      if (this.jammerT > 0) rate *= 0.5;
+      const rate = tw.suppressT > 0 ? 0.4 : 1;
       tw.cooldown -= dt * rate;
       if (tw.cooldown > 0) {
         // keep tracking current target for visual continuity
@@ -552,13 +525,14 @@ export class Sim {
     if (p.droneState === 'hunt') {
       let target = this.tanks.find((x) => x.id === p.targetTank && this.targetable(x));
       if (!target) {
-        // retarget near the hive's patrol leash
+        // retarget the furthest-along tank inside the hive's patrol leash
         const lvl = TOWERS.hive.levels[home.level - 1];
-        let bd = lvl.range + 80;
+        const leash = lvl.range + 80;
+        let bestDist = -1;
         for (const t of this.tanks) {
           if (!this.targetable(t)) continue;
-          const d = distance(t.pos, home.pos);
-          if (d < bd) { bd = d; target = t; }
+          if (distance(t.pos, home.pos) > leash) continue;
+          if (t.dist > bestDist) { bestDist = t.dist; target = t; }
         }
         if (target) p.targetTank = target.id;
         else { p.droneState = 'return'; return; }
@@ -613,8 +587,8 @@ export class Sim {
         const t = this.tanks.find((x) => x.id === p.targetTank && this.targetable(x));
         if (t) targetPos = t.pos;
         else if (p.kind === 'missile' || p.kind === 'bigmissile') {
-          // retarget nearest
-          const nt = this.nearestTank(p.pos);
+          // retarget whoever is closest to the base
+          const nt = this.furthestTank();
           if (nt) { p.targetTank = nt.id; targetPos = nt.pos; }
         }
       } else if (p.targetTower !== undefined) {
@@ -693,13 +667,12 @@ export class Sim {
     }
   }
 
-  private nearestTank(pos: Vec): Tank | undefined {
+  private furthestTank(): Tank | undefined {
     let best: Tank | undefined;
-    let bd = Infinity;
+    let bd = -1;
     for (const t of this.tanks) {
       if (!this.targetable(t)) continue;
-      const d = distance(t.pos, pos);
-      if (d < bd) { bd = d; best = t; }
+      if (t.dist > bd) { bd = t.dist; best = t; }
     }
     return best;
   }

@@ -59,8 +59,6 @@ export class Renderer {
   private textPool: Text[] = [];
   private tex = new Map<string, Texture>();
   private softTex!: Texture;
-  private bannerOD!: Text;
-  private bannerJam!: Text;
 
   private shake = 0;
   private scale = 1;
@@ -99,7 +97,6 @@ export class Renderer {
     this.app.stage.addChild(this.world);
     this.buildSoftTexture();
     this.buildBoard();
-    this.buildBanners();
 
     this.app.stage.eventMode = 'static';
     this.app.stage.hitArea = { contains: () => true };
@@ -214,26 +211,9 @@ export class Renderer {
     b.roundRect(bp.x - 58, bp.y - 58, 116, 116, 10).fill({ color: PAPER });
     sk.rect(b, bp.x - 58, bp.y - 58, 116, 116, { color: INK, width: 3, jitter: 1.8, overshoot: 6 });
     sk.rect(b, bp.x - 42, bp.y - 42, 84, 84, { color: INK_LIGHT, width: 2, jitter: 1.4, overshoot: 3 });
-    drawHeart(b, bp.x, bp.y, 1.5, RED);
+    drawHeart(b, bp.x, bp.y, 2.7, RED);
 
     this.boardLayer.addChild(b);
-  }
-
-  private buildBanners() {
-    const mk = (y: number) => {
-      const t = new Text({
-        text: '',
-        style: { fontFamily: FONT, fontSize: 24, fontWeight: '700', fill: RED },
-      });
-      t.anchor.set(0.5);
-      t.position.set(WORLD_W / 2, y);
-      t.rotation = -0.015;
-      t.visible = false;
-      this.world.addChild(t);
-      return t;
-    };
-    this.bannerOD = mk(28);
-    this.bannerJam = mk(60);
   }
 
   // ---------------- procedural textures ----------------
@@ -924,10 +904,8 @@ export class Renderer {
       }
     }
 
-    // status overlay: slow / overdrive marks on tanks, suppress / jammer on towers
+    // status overlay: slow marks on tanks, suppression on towers
     this.statusG.clear();
-    const odOn = sim.overdriveT > 0;
-    const jamOn = sim.jammerT > 0;
     for (const tank of sim.tanks) {
       const r = UNITS[tank.kind].radius;
       if (tank.slow.t > 0 && tank.slow.mult < 1) {
@@ -942,36 +920,9 @@ export class Renderer {
         }
         this.statusG.stroke({ width: 2, color: BLUE, alpha: 0.75, cap: 'round' });
       }
-      if (odOn) {
-        // red speed dashes trailing the hull
-        const bx = -Math.cos(tank.angle);
-        const by = -Math.sin(tank.angle);
-        for (let k = -1; k <= 1; k++) {
-          const px = -by * k * 7;
-          const py = bx * k * 7;
-          const sx = tank.pos.x + bx * (r + 6) + px;
-          const sy = tank.pos.y + by * (r + 6) + py;
-          this.statusG.moveTo(sx, sy);
-          this.statusG.lineTo(sx + bx * (10 - Math.abs(k) * 3), sy + by * (10 - Math.abs(k) * 3));
-        }
-        this.statusG.stroke({ width: 2.5, color: RED, alpha: 0.6, cap: 'round' });
-      }
     }
     for (const tw of sim.towers) {
       if (tw.suppressT > 0) this.zigzag(tw.pos.x, tw.pos.y - 40, INK, 0.8);
-      if (jamOn) this.zigzag(tw.pos.x, tw.pos.y - (tw.suppressT > 0 ? 50 : 40), RED, 0.7);
-    }
-
-    // ability banners with countdowns
-    this.bannerOD.visible = odOn;
-    if (odOn) {
-      const s = `OVERDRIVE ${sim.overdriveT.toFixed(1)}s`;
-      if (this.bannerOD.text !== s) this.bannerOD.text = s;
-    }
-    this.bannerJam.visible = jamOn;
-    if (jamOn) {
-      const s = `JAMMER ${sim.jammerT.toFixed(1)}s`;
-      if (this.bannerJam.text !== s) this.bannerJam.text = s;
     }
 
     // projectiles
@@ -1087,17 +1038,13 @@ function easeOutBack(t: number): number {
   return 1 + c3 * (t - 1) ** 3 + c1 * (t - 1) ** 2;
 }
 
-/** classic two-lobe heart, centered on (x, y); s≈1 → ~30px tall */
-function drawHeart(g: Graphics, x: number, y: number, s: number, color: number) {
-  const cy = y - 13 * s;
-  g.moveTo(x, cy + 9 * s);
-  g.bezierCurveTo(x, cy + 4 * s, x - 5 * s, cy - 3 * s, x - 11 * s, cy - 3 * s);
-  g.bezierCurveTo(x - 18 * s, cy - 3 * s, x - 22 * s, cy + 2 * s, x - 22 * s, cy + 7 * s);
-  g.bezierCurveTo(x - 22 * s, cy + 15 * s, x - 13 * s, cy + 21 * s, x, cy + 28 * s);
-  g.bezierCurveTo(x + 13 * s, cy + 21 * s, x + 22 * s, cy + 15 * s, x + 22 * s, cy + 7 * s);
-  g.bezierCurveTo(x + 22 * s, cy + 2 * s, x + 18 * s, cy - 3 * s, x + 11 * s, cy - 3 * s);
-  g.bezierCurveTo(x + 5 * s, cy - 3 * s, x, cy + 4 * s, x, cy + 9 * s);
-  g.fill(color);
+/** the heart from the icon set (lucide geometry: two lobes + point), centered on (x, y) */
+function drawHeart(g: Graphics, cx: number, cy: number, s: number, color: number) {
+  const x = (u: number) => cx + (u - 12) * s;
+  const y = (v: number) => cy + (v - 12.5) * s;
+  g.circle(x(7.5), y(8.5), 5.5 * s).fill(color);
+  g.circle(x(16.5), y(8.5), 5.5 * s).fill(color);
+  g.poly([x(2.6), y(10.8), x(12), y(21), x(21.4), y(10.8), x(12), y(8)]).fill(color);
 }
 
 /** dashed wobbly line */

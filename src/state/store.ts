@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 import {
-  ABILITIES, MAX_ABILITIES_PER_WAVE, ROUNDS, SLOTS, START_LIVES, TOWERS, UNITS,
+  ROUNDS, SLOTS, START_LIVES, TOWERS, UNITS,
   attackerBudget, defenderCatchUp, defenderIncome, DEF_START_BRICKS, LEAK_REWARD, SELL_RATIO, SHUTOUT_PITY,
 } from '../game/config';
 import { Renderer } from '../game/renderer';
 import { Sim } from '../game/sim';
 import { sfx } from '../game/audio';
-import type { AbilityKind, Phase, TowerKind, UnitKind } from '../game/types';
+import type { Phase, TowerKind, UnitKind } from '../game/types';
 
 export const sim = new Sim();
 export const renderer = new Renderer();
@@ -34,12 +34,10 @@ interface GameState {
 
   // wave draft (attacker)
   draft: UnitKind[];
-  draftAbilities: AbilityKind[];
 
   // combat
   speed: number;
   paused: boolean;
-  abilityCharges: AbilityKind[];
   waveSize: number;
   tanksRemaining: number; // queue + alive
 
@@ -60,13 +58,11 @@ interface GameState {
   addUnit: (k: UnitKind) => void;
   removeUnit: (index: number) => void;
   clearDraft: () => void;
-  toggleAbility: (k: AbilityKind) => void;
   launchWave: () => void;
   beginCombat: () => void;
   onFrame: (deltaMS: number) => void;
   setSpeed: (s: number) => void;
   setPaused: (p: boolean) => void;
-  triggerAbility: (k: AbilityKind) => void;
   buildTower: (slot: number, kind: TowerKind) => void;
   upgradeTower: (towerId: number) => void;
   repairTower: (towerId: number) => void;
@@ -83,9 +79,8 @@ export function repairCost(hp: number, maxHp: number, invested: number): number 
 let pendingEnd: { kind: 'defeat' } | { kind: 'wave'; summary: SummaryData } | null = null;
 let pendingAt = 0;
 
-function draftCost(draft: UnitKind[], abilities: AbilityKind[]): number {
-  return draft.reduce((s, k) => s + UNITS[k].cost, 0)
-    + abilities.reduce((s, k) => s + ABILITIES[k].cost, 0);
+function draftCost(draft: UnitKind[]): number {
+  return draft.reduce((s, k) => s + UNITS[k].cost, 0);
 }
 
 function updateRangePreview(state: { phase: Phase; selection: Selection }) {
@@ -113,10 +108,8 @@ export const useGame = create<GameState>((set, get) => ({
   defBricks: DEF_START_BRICKS,
   atkBricks: 0,
   draft: [],
-  draftAbilities: [],
   speed: 1,
   paused: false,
-  abilityCharges: [],
   waveSize: 0,
   tanksRemaining: 0,
   livesLostThisWave: 0,
@@ -136,8 +129,8 @@ export const useGame = create<GameState>((set, get) => ({
     pendingEnd = null;
     set({
       round: 1, lives: START_LIVES, defBricks: DEF_START_BRICKS, atkBricks: 0,
-      draft: [], draftAbilities: [], winner: null, lastSummary: null,
-      abilityCharges: [], selection: null, speed: 1, paused: false,
+      draft: [], winner: null, lastSummary: null,
+      selection: null, speed: 1, paused: false,
     });
     get().beginRound();
   },
@@ -172,17 +165,16 @@ export const useGame = create<GameState>((set, get) => ({
       phase: 'waveBuild',
       atkBricks: s.atkBricks + budget,
       draft: [],
-      draftAbilities: [],
     }));
     updateRangePreview(get());
     sfx('ui');
   },
 
   addUnit: (k) => {
-    const { draft, draftAbilities, atkBricks, round } = get();
+    const { draft, atkBricks } = get();
     const def = UNITS[k];
-    if (def.unlockRound > round) { sfx('ui_deny'); return; }
-    const cost = draftCost(draft, draftAbilities) + def.cost;
+    if (def.maxPerWave && draft.filter((d) => d === k).length >= def.maxPerWave) { sfx('ui_deny'); return; }
+    const cost = draftCost(draft) + def.cost;
     if (cost > atkBricks) { sfx('ui_deny'); return; }
     set({ draft: [...draft, k] });
     sfx('ui_add');
@@ -193,21 +185,7 @@ export const useGame = create<GameState>((set, get) => ({
     sfx('ui_remove');
   },
 
-  clearDraft: () => { set({ draft: [], draftAbilities: [] }); sfx('ui_remove'); },
-
-  toggleAbility: (k) => {
-    const { draftAbilities, draft, atkBricks } = get();
-    if (draftAbilities.includes(k)) {
-      set({ draftAbilities: draftAbilities.filter((a) => a !== k) });
-      sfx('ui_remove');
-      return;
-    }
-    if (draftAbilities.length >= MAX_ABILITIES_PER_WAVE) { sfx('ui_deny'); return; }
-    const cost = draftCost(draft, [...draftAbilities, k]);
-    if (cost > atkBricks) { sfx('ui_deny'); return; }
-    set({ draftAbilities: [...draftAbilities, k] });
-    sfx('ui_add');
-  },
+  clearDraft: () => { set({ draft: [] }); sfx('ui_remove'); },
 
   launchWave: () => {
     const { draft } = get();
@@ -218,14 +196,13 @@ export const useGame = create<GameState>((set, get) => ({
   },
 
   beginCombat: () => {
-    const { draft, draftAbilities, atkBricks } = get();
-    const spend = draftCost(draft, draftAbilities);
+    const { draft, atkBricks } = get();
+    const spend = draftCost(draft);
     pendingEnd = null;
     sim.startWave(draft);
     set({
       phase: 'combat',
       atkBricks: atkBricks - spend,
-      abilityCharges: [...draftAbilities],
       waveSize: draft.length,
       tanksRemaining: draft.length,
       paused: false,
@@ -325,18 +302,12 @@ export const useGame = create<GameState>((set, get) => ({
   setSpeed: (s) => { set({ speed: s }); sfx('ui'); },
   setPaused: (p) => { set({ paused: p }); sfx('ui'); },
 
-  triggerAbility: (k) => {
-    const { abilityCharges, phase } = get();
-    if (phase !== 'combat' || !abilityCharges.includes(k)) { sfx('ui_deny'); return; }
-    sim.triggerAbility(k);
-    const idx = abilityCharges.indexOf(k);
-    set({ abilityCharges: abilityCharges.filter((_, i) => i !== idx) });
-  },
-
   buildTower: (slot, kind) => {
     const { defBricks, phase } = get();
     if (phase !== 'defendBuild' && phase !== 'combat') return;
-    const cost = TOWERS[kind].levels[0].cost;
+    const def = TOWERS[kind];
+    const cost = def.levels[0].cost;
+    if (def.maxCount && sim.towers.filter((t) => t.kind === kind).length >= def.maxCount) { sfx('ui_deny'); return; }
     if (cost > defBricks || sim.towerAt(slot)) { sfx('ui_deny'); return; }
     sim.buildTower(slot, kind);
     set({ defBricks: defBricks - cost, selection: null });

@@ -46,11 +46,13 @@ export function BoardPopup() {
             const def = TOWERS[k];
             const cost = def.levels[0].cost;
             const isArmed = armed === k;
+            const capped = def.maxCount !== undefined
+              && sim.towers.filter((t) => t.kind === k).length >= def.maxCount;
             return (
               <button
                 key={k}
                 className={`neu pop-card${isArmed ? ' armed' : ''}`}
-                disabled={cost > defBricks}
+                disabled={capped || cost > defBricks}
                 onMouseEnter={() => preview(k)}
                 onClick={() => {
                   if (isArmed) { buildTower(selection.slot, k); return; }
@@ -62,15 +64,15 @@ export function BoardPopup() {
                 <TowerIcon kind={k} />
                 <span className="nm">{def.short}</span>
                 <span className="cost"><Brick /> {cost}</span>
-                <span className="meta">rng {def.levels[0].range}</span>
+                <span className="meta">{capped ? `max ${def.maxCount}` : `rng ${def.levels[0].range}`}</span>
               </button>
             );
           })}
         </div>
         <span className="pop-hint">
           {armed
-            ? `tap ${TOWERS[armed].short} again to build — circle shows its range`
-            : 'tap a tower to see its range from this pad'}
+            ? `${TOWERS[armed].desc} — tap ${TOWERS[armed].short} again to build`
+            : 'tap a tower to see its range and description'}
         </span>
       </div>
     );

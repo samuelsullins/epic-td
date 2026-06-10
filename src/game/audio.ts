@@ -127,9 +127,6 @@ export function sfx(name: string) {
       case 'drone': if (gate('drone', 180)) whoosh(0.22, 0.09, 700, 1900); break;
       case 'boomer': boom(95, 0.55, 0.45, 0.95); break;
       case 'flak': if (gate('flak', 100)) tick(1900, 0.07, 0.03, 'square'); break;
-      case 'ability_overdrive': whoosh(0.5, 0.25, 300, 3000); break;
-      case 'ability_jammer': whoosh(0.6, 0.25, 2400, 200); break;
-      case 'ability_patch': tick(520, 0.2, 0.2); tick(780, 0.18, 0.3); break;
       case 'victory': [440, 554, 659, 880].forEach((f, i) => setTimeout(() => tick(f, 0.22, 0.5), i * 130)); break;
       case 'defeat': [330, 311, 233, 175].forEach((f, i) => setTimeout(() => tick(f, 0.22, 0.6, 'sine'), i * 180)); break;
       default: break;

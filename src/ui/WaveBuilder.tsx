@@ -1,5 +1,5 @@
 import { Rocket, Trash2 } from 'lucide-react';
-import { ABILITIES, ABILITY_ORDER, UNITS, UNIT_ORDER } from '../game/config';
+import { UNITS, UNIT_ORDER } from '../game/config';
 import { useGame } from '../state/store';
 import type { UnitKind } from '../game/types';
 import { Brick, UnitIcon } from './icons';
@@ -16,18 +16,14 @@ function groupDraft(draft: UnitKind[]): { kind: UnitKind; count: number; lastInd
 }
 
 export function WaveBuilder() {
-  const round = useGame((s) => s.round);
   const atkBricks = useGame((s) => s.atkBricks);
   const draft = useGame((s) => s.draft);
-  const draftAbilities = useGame((s) => s.draftAbilities);
   const addUnit = useGame((s) => s.addUnit);
   const removeUnit = useGame((s) => s.removeUnit);
   const clearDraft = useGame((s) => s.clearDraft);
-  const toggleAbility = useGame((s) => s.toggleAbility);
   const launchWave = useGame((s) => s.launchWave);
 
-  const spent = draft.reduce((s, k) => s + UNITS[k].cost, 0)
-    + draftAbilities.reduce((s, k) => s + ABILITIES[k].cost, 0);
+  const spent = draft.reduce((s, k) => s + UNITS[k].cost, 0);
   const groups = groupDraft(draft);
 
   return (
@@ -36,7 +32,7 @@ export function WaveBuilder() {
         <div className="meter">
           <div className="label">
             <span>BRICKS (unspent bricks bank for later rounds)</span>
-            <b><Brick /> {atkBricks - spent} <span style={{ color: 'var(--mid)', fontWeight: 700 }}>/ {atkBricks}</span></b>
+            <b><Brick /> {atkBricks - spent} <span style={{ color: 'var(--ink-light)', fontWeight: 700 }}>/ {atkBricks}</span></b>
           </div>
           <div className="bar"><div className="fill" style={{ width: `${Math.max(0, ((atkBricks - spent) / Math.max(1, atkBricks)) * 100)}%` }} /></div>
         </div>
@@ -62,34 +58,21 @@ export function WaveBuilder() {
         <div className="card-row">
           {UNIT_ORDER.map((k) => {
             const def = UNITS[k];
-            const locked = def.unlockRound > round;
+            const inDraft = draft.filter((d) => d === k).length;
+            const capped = def.maxPerWave !== undefined && inDraft >= def.maxPerWave;
             const afford = spent + def.cost <= atkBricks;
             return (
               <button
                 key={k}
-                className={`neu unit-card${locked ? ' locked' : ''}`}
-                disabled={locked || !afford}
+                className="neu unit-card"
+                disabled={capped || !afford}
                 onClick={() => addUnit(k)}
                 title={def.desc}
               >
-                {locked && <span className="lock-tag">R{def.unlockRound}</span>}
                 <UnitIcon kind={k} />
                 <span className="nm">{def.name.toUpperCase()}</span>
                 <span className="cost"><Brick /> {def.cost}</span>
-                <span className="meta">{def.hp}hp · {def.speed}sp</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {ABILITY_ORDER.map((k) => {
-            const a = ABILITIES[k];
-            const on = draftAbilities.includes(k);
-            return (
-              <button key={k} className={`neu ability-pick${on ? ' on' : ''}`} onClick={() => toggleAbility(k)}>
-                <span className="t">{a.name.toUpperCase()} <span><Brick /> {a.cost}</span></span>
-                <span className="d">{a.desc}</span>
+                <span className="meta">{capped ? `max ${def.maxPerWave}` : `${def.hp}hp`}</span>
               </button>
             );
           })}

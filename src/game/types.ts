@@ -19,8 +19,6 @@ export type UnitKind =
 
 export type TowerKind = 'gun' | 'swarm' | 'arc' | 'railgun' | 'emp' | 'bertha' | 'hive' | 'ciws' | 'bastion' | 'medic';
 
-export type AbilityKind = 'overdrive' | 'jammer' | 'patch';
-
 export interface UnitDef {
   kind: UnitKind;
   name: string;
@@ -53,6 +51,7 @@ export interface UnitDef {
   intercept?: { range: number; cooldown: number }; // flak: downs defender missiles
   phase?: { visibleT: number; hiddenT: number }; // phantom: pulses untargetable
   hidden?: boolean; // spawn-only units (mites) — not purchasable
+  maxPerWave?: number; // cap per wave (flak)
 }
 
 export interface TowerLevel {
@@ -81,14 +80,7 @@ export interface TowerDef {
   desc: string;
   levels: TowerLevel[]; // length 3
   projectile: 'bullet' | 'missile' | 'bigmissile' | 'pulse' | 'beam' | 'railshot' | 'drone' | 'zap' | 'aura';
-}
-
-export interface AbilityDef {
-  kind: AbilityKind;
-  name: string;
-  cost: number;
-  desc: string;
-  duration: number;
+  maxCount?: number; // cap on simultaneous builds (ciws)
 }
 
 // ---- live entities (sim) ----

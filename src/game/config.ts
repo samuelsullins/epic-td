@@ -1,4 +1,4 @@
-import type { AbilityDef, TowerDef, UnitDef, UnitKind, TowerKind, AbilityKind, Vec } from './types';
+import type { TowerDef, UnitDef, UnitKind, TowerKind, Vec } from './types';
 
 // ---------------- match ----------------
 export const ROUNDS = 12;
@@ -40,42 +40,42 @@ export function defenderCatchUp(lives: number): number {
 // old single-shot values, just delivered twice as often at half strength.
 export const UNITS: Record<UnitKind, UnitDef> = {
   scout: {
-    kind: 'scout', name: 'Scout', cost: 10, tonnage: 1, hp: 70, speed: 95,
+    kind: 'scout', name: 'Scout', cost: 10, tonnage: 1, hp: 70, speed: 60,
     leakDamage: 1, bounty: 3, unlockRound: 1, radius: 13,
     desc: 'Cheap and fast. Pecks at towers with a light gun.',
     attack: { damage: 2, range: 115, cooldown: 0.75, volley: 1, projectile: 'bullet' },
   },
   brawler: {
-    kind: 'brawler', name: 'Brawler', cost: 18, tonnage: 2, hp: 190, speed: 62,
+    kind: 'brawler', name: 'Brawler', cost: 18, tonnage: 2, hp: 190, speed: 60,
     leakDamage: 1, bounty: 6, unlockRound: 1, radius: 16,
     desc: 'The workhorse. Honest HP, honest cannon.',
     attack: { damage: 4.5, range: 135, cooldown: 1.1, volley: 1, projectile: 'bullet' },
   },
   hunter: {
-    kind: 'hunter', name: 'Hunter', cost: 30, tonnage: 2, hp: 150, speed: 68,
+    kind: 'hunter', name: 'Hunter', cost: 30, tonnage: 2, hp: 150, speed: 60,
     leakDamage: 1, bounty: 10, unlockRound: 1, radius: 16,
     desc: 'Long-range missile sniper. Cracks towers open from afar.',
     attack: { damage: 17, range: 185, cooldown: 2.25, volley: 1, projectile: 'missile' },
   },
   heavy: {
-    kind: 'heavy', name: 'Heavy', cost: 38, tonnage: 3, hp: 540, speed: 44,
+    kind: 'heavy', name: 'Heavy', cost: 38, tonnage: 3, hp: 540, speed: 60,
     leakDamage: 2, bounty: 13, unlockRound: 1, radius: 19,
     desc: 'Slow slab of armor with a real cannon. Eats bullets, spits them back.',
     attack: { damage: 7.5, range: 145, cooldown: 1.4, volley: 1, projectile: 'bullet' },
   },
   boomer: {
-    kind: 'boomer', name: 'Boomer', cost: 26, tonnage: 2, hp: 170, speed: 80,
+    kind: 'boomer', name: 'Boomer', cost: 26, tonnage: 2, hp: 170, speed: 60,
     leakDamage: 1, bounty: 8, unlockRound: 1, radius: 15,
-    deathBlast: { radius: 95, damage: 90 },
+    deathBlast: { radius: 150, damage: 150 },
     desc: 'Dies loudly — the blast craters nearby towers. Or let it walk?',
   },
   decoy: {
-    kind: 'decoy', name: 'Decoy', cost: 24, tonnage: 2, hp: 220, speed: 72,
+    kind: 'decoy', name: 'Decoy', cost: 24, tonnage: 2, hp: 220, speed: 60,
     leakDamage: 1, bounty: 8, unlockRound: 1, radius: 15, taunt: true,
     desc: 'Towers can’t resist shooting it first. Use as a shield.',
   },
   shield: {
-    kind: 'shield', name: 'Aegis', cost: 46, tonnage: 3, hp: 280, speed: 55,
+    kind: 'shield', name: 'Aegis', cost: 46, tonnage: 3, hp: 280, speed: 60,
     leakDamage: 2, bounty: 15, unlockRound: 1, radius: 17,
     aura: { radius: 95, damageMult: 0.7 },
     desc: 'Projects a bubble: nearby allies take 30% less damage.',
@@ -88,42 +88,42 @@ export const UNITS: Record<UnitKind, UnitDef> = {
     desc: 'Cracks open into three angry mites when destroyed.',
   },
   mite: {
-    kind: 'mite', name: 'Mite', cost: 0, tonnage: 1, hp: 55, speed: 105,
+    kind: 'mite', name: 'Mite', cost: 0, tonnage: 1, hp: 55, speed: 60,
     leakDamage: 1, bounty: 2, unlockRound: 1, radius: 10, hidden: true,
     desc: 'A splitter’s grudge, in triplicate.',
   },
   flak: {
-    kind: 'flak', name: 'Flak Rig', cost: 40, tonnage: 2, hp: 240, speed: 60,
-    leakDamage: 1, bounty: 9, unlockRound: 1, radius: 16,
+    kind: 'flak', name: 'Flak Rig', cost: 40, tonnage: 2, hp: 300, speed: 60,
+    leakDamage: 1, bounty: 9, unlockRound: 1, radius: 16, maxPerWave: 4,
     intercept: { range: 160, cooldown: 0.9 },
-    desc: 'Shoots defender missiles out of the sky. Swarm and Bertha hate it.',
+    desc: 'Shoots defender missiles out of the sky. Max 4 per wave.',
   },
   phantom: {
-    kind: 'phantom', name: 'Phantom', cost: 36, tonnage: 2, hp: 200, speed: 75,
+    kind: 'phantom', name: 'Phantom', cost: 36, tonnage: 2, hp: 200, speed: 60,
     leakDamage: 1, bounty: 8, unlockRound: 1, radius: 15,
     phase: { visibleT: 2.2, hiddenT: 1.4 },
     desc: 'Pulses invisible — towers can’t aim at what isn’t there. Splash still hurts it.',
   },
   mortar: {
-    kind: 'mortar', name: 'Mortar Crawler', cost: 52, tonnage: 3, hp: 240, speed: 48,
+    kind: 'mortar', name: 'Mortar Crawler', cost: 52, tonnage: 3, hp: 240, speed: 60,
     leakDamage: 2, bounty: 17, unlockRound: 1, radius: 18,
     desc: 'Lobs suppression shells that slow a tower’s fire rate.',
     attack: { type: 'suppress', damage: 14, range: 235, cooldown: 2.75, duration: 1.5, volley: 1, projectile: 'missile' },
   },
   mechanic: {
-    kind: 'mechanic', name: 'Mechanic', cost: 48, tonnage: 3, hp: 260, speed: 58,
+    kind: 'mechanic', name: 'Mechanic', cost: 48, tonnage: 3, hp: 260, speed: 60,
     leakDamage: 1, bounty: 10, unlockRound: 1, radius: 16,
     healAura: { radius: 95, hps: 10 },
     desc: 'Field repairs on the move. Keeps the column rolling.',
   },
   goliath: {
-    kind: 'goliath', name: 'GOLIATH', cost: 130, tonnage: 6, hp: 1900, speed: 36,
+    kind: 'goliath', name: 'GOLIATH', cost: 130, tonnage: 6, hp: 1900, speed: 60,
     leakDamage: 4, bounty: 40, unlockRound: 1, radius: 26,
     desc: 'Boss. Volleys of heavy missiles. A rolling fortress.',
     attack: { damage: 17.5, range: 200, cooldown: 3.5, volley: 3, projectile: 'missile' },
   },
   leviathan: {
-    kind: 'leviathan', name: 'LEVIATHAN', cost: 270, tonnage: 10, hp: 5000, speed: 30,
+    kind: 'leviathan', name: 'LEVIATHAN', cost: 270, tonnage: 10, hp: 5000, speed: 60,
     leakDamage: 8, bounty: 80, unlockRound: 1, radius: 32, slowResist: 0.5,
     desc: 'The end of the world on treads. Shielded, seething, unstoppable?',
     attack: { damage: 22.5, range: 210, cooldown: 3, volley: 3, projectile: 'missile' },
@@ -196,14 +196,14 @@ export const TOWERS: Record<TowerKind, TowerDef> = {
     kind: 'hive', name: 'Beehive', short: 'HIVE', projectile: 'drone',
     desc: 'A box of angry drones. They sting and sting, then fly home to recharge.',
     levels: [
-      { cost: 160, hp: 280, range: 165, damage: 6, cooldown: 0.4, drones: 3, stings: 4 },
-      { cost: 120, hp: 340, range: 180, damage: 8, cooldown: 0.38, drones: 4, stings: 4 },
-      { cost: 190, hp: 400, range: 195, damage: 10, cooldown: 0.35, drones: 5, stings: 5 },
+      { cost: 160, hp: 280, range: 165, damage: 9, cooldown: 0.4, drones: 3, stings: 4 },
+      { cost: 120, hp: 340, range: 180, damage: 12, cooldown: 0.38, drones: 4, stings: 4 },
+      { cost: 190, hp: 400, range: 195, damage: 15, cooldown: 0.35, drones: 5, stings: 5 },
     ],
   },
   ciws: {
-    kind: 'ciws', name: 'Point Defense', short: 'CIWS', projectile: 'beam',
-    desc: 'Shoots enemy missiles out of the sky. Weak vs armor.',
+    kind: 'ciws', name: 'Point Defense', short: 'CIWS', projectile: 'beam', maxCount: 4,
+    desc: 'Shoots enemy missiles out of the sky. Weak vs armor. Max 4.',
     levels: [
       { cost: 140, hp: 300, range: 150, damage: 4, cooldown: 0.4, interceptPerSec: 4 },
       { cost: 100, hp: 360, range: 165, damage: 7, cooldown: 0.35, interceptPerSec: 6 },
@@ -214,9 +214,9 @@ export const TOWERS: Record<TowerKind, TowerDef> = {
     kind: 'bastion', name: 'Bastion', short: 'BASTION', projectile: 'aura',
     desc: 'Projects a shield dome: towers inside take less damage.',
     levels: [
-      { cost: 120, hp: 420, range: 130, damage: 0, cooldown: 99, shieldMult: 0.7 },
-      { cost: 90, hp: 520, range: 150, damage: 0, cooldown: 99, shieldMult: 0.6 },
-      { cost: 150, hp: 620, range: 170, damage: 0, cooldown: 99, shieldMult: 0.5 },
+      { cost: 120, hp: 420, range: 180, damage: 0, cooldown: 99, shieldMult: 0.7 },
+      { cost: 90, hp: 520, range: 210, damage: 0, cooldown: 99, shieldMult: 0.6 },
+      { cost: 150, hp: 620, range: 240, damage: 0, cooldown: 99, shieldMult: 0.5 },
     ],
   },
   medic: {
@@ -236,24 +236,6 @@ export const TOWER_ORDER: TowerKind[] = [
 
 // upgraded towers are bigger targets: bonus damage taken from tank fire per level
 export const TOWER_LEVEL_VULN = 0.15; // L2 +15%, L3 +30%
-
-// ---------------- attacker abilities ----------------
-export const ABILITIES: Record<AbilityKind, AbilityDef> = {
-  overdrive: {
-    kind: 'overdrive', name: 'Overdrive', cost: 50,
-    desc: 'All tanks +45% speed for 3s.', duration: 3,
-  },
-  jammer: {
-    kind: 'jammer', name: 'Jammer', cost: 60,
-    desc: 'All towers fire 50% slower for 4s.', duration: 4,
-  },
-  patch: {
-    kind: 'patch', name: 'Patch Kit', cost: 55,
-    desc: 'Heal every living tank for 25% of max HP.', duration: 0,
-  },
-};
-export const ABILITY_ORDER: AbilityKind[] = ['overdrive', 'jammer', 'patch'];
-export const MAX_ABILITIES_PER_WAVE = 2;
 
 // ---------------- map ----------------
 // Switchback path, left to right. Start off-screen left, base off right.

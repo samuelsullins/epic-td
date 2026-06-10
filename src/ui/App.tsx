@@ -2,14 +2,14 @@ import { useState } from 'react';
 import {
   ArrowRightLeft, FastForward, Heart, Pause, Play, Shield, Swords, Volume2, VolumeX,
 } from 'lucide-react';
-import { ABILITIES, ROUNDS, TOWERS, TOWER_ORDER } from '../game/config';
+import { ROUNDS } from '../game/config';
 import { isMuted, setMuted } from '../game/audio';
 import { useGame } from '../state/store';
 import { GameCanvas } from './GameCanvas';
 import { Overlays } from './Overlays';
 import { BoardPopup } from './Popups';
 import { WaveBuilder } from './WaveBuilder';
-import { AbilityGlyph, Brick, TowerIcon } from './icons';
+import { Brick } from './icons';
 
 export function App() {
   return (
@@ -17,7 +17,6 @@ export function App() {
       <Hud />
       <div className="board-wrap">
         <GameCanvas />
-        <AbilityRail />
       </div>
       <BottomPanel />
       <BoardPopup />
@@ -74,24 +73,6 @@ function Hud() {
   );
 }
 
-function AbilityRail() {
-  const phase = useGame((s) => s.phase);
-  const charges = useGame((s) => s.abilityCharges);
-  const triggerAbility = useGame((s) => s.triggerAbility);
-  if (phase !== 'combat' || charges.length === 0) return null;
-  return (
-    <div className="ability-rail">
-      <span className="rail-label">ATTACKER</span>
-      {charges.map((k, i) => (
-        <button key={`${k}_${i}`} className="neu ability-btn" onClick={() => triggerAbility(k)}>
-          <AbilityGlyph kind={k} />
-          {ABILITIES[k].name.toUpperCase()}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function BottomPanel() {
   const phase = useGame((s) => s.phase);
   if (phase === 'waveBuild') return <WaveBuilder />;
@@ -101,32 +82,14 @@ function BottomPanel() {
 
 function DefenderBar() {
   const phase = useGame((s) => s.phase);
-  const defBricks = useGame((s) => s.defBricks);
   const defenderReady = useGame((s) => s.defenderReady);
   const waveSize = useGame((s) => s.waveSize);
   const tanksRemaining = useGame((s) => s.tanksRemaining);
 
   return (
     <div className="bottom">
-      {/* flat printed price list — not buttons; building happens on the pads */}
-      <div className="ref-strip">
-        {TOWER_ORDER.map((k) => {
-          const def = TOWERS[k];
-          const cost = def.levels[0].cost;
-          const afford = cost <= defBricks;
-          return (
-            <div key={k} className={`ref-item${afford ? '' : ' dim'}`} title={def.desc}>
-              <TowerIcon kind={k} size={26} />
-              <div className="ref-text">
-                <span className="nm">{def.short} <b><Brick /> {cost}</b></span>
-                <span className="meta">{def.desc.split('.')[0]}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
       {phase === 'combat' ? (
-        <div className="wave-progress">
+        <div className="wave-progress" style={{ flex: 1 }}>
           <span className="label">WAVE&nbsp;&nbsp;{Math.max(0, waveSize - tanksRemaining)} / {waveSize} DOWN</span>
           <div className="bar">
             <div className="fill" style={{ width: `${waveSize ? ((waveSize - tanksRemaining) / waveSize) * 100 : 0}%` }} />
@@ -134,8 +97,8 @@ function DefenderBar() {
           <span className="label" style={{ fontWeight: 600, letterSpacing: 0 }}>Tap a pad to build mid-wave</span>
         </div>
       ) : (
-        <button className="neu launch-btn def" onClick={defenderReady}>
-          <ArrowRightLeft size={20} strokeWidth={2.5} /> READY —<br />PASS DEVICE
+        <button className="neu launch-btn def" style={{ flex: 1, justifyContent: 'center', padding: '12px 26px' }} onClick={defenderReady}>
+          <ArrowRightLeft size={20} strokeWidth={2.5} /> READY — PASS DEVICE
         </button>
       )}
     </div>

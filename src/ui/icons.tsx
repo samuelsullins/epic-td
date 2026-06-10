@@ -1,5 +1,4 @@
-import { ChevronsRight, WifiOff, Wrench } from 'lucide-react';
-import type { AbilityKind, TowerKind, UnitKind } from '../game/types';
+import type { TowerKind, UnitKind } from '../game/types';
 
 // whiteboard marker palette (mirrors renderer.ts)
 const INK = '#32353a';
@@ -228,14 +227,6 @@ function towerIcon(kind: TowerKind) {
         <rect x="14.4" y="11" width="3.2" height="10" rx="1" fill={PAPER} />
         <rect x="11" y="14.4" width="10" height="3.2" rx="1" fill={PAPER} />
       </>);
-  }
-}
-
-export function AbilityGlyph({ kind, size = 22 }: { kind: AbilityKind; size?: number }) {
-  switch (kind) {
-    case 'overdrive': return <ChevronsRight size={size} strokeWidth={2.5} />;
-    case 'jammer': return <WifiOff size={size} strokeWidth={2.5} />;
-    case 'patch': return <Wrench size={size} strokeWidth={2.5} />;
   }
 }
 
