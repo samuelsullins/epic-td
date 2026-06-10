@@ -306,9 +306,9 @@ export const TOWERS: Record<TowerKind, TowerDef> = {
     kind: 'minelayer', name: 'Mine Layer', short: 'MINES', projectile: 'mine',
     desc: 'Seeds the road with mines. Crunch.',
     levels: [
-      { cost: 170, hp: 300, range: 140, damage: 60, cooldown: 3.5, splash: 55, maxMines: 3 },
-      { cost: 130, hp: 370, range: 160, damage: 85, cooldown: 3.0, splash: 60, maxMines: 4 },
-      { cost: 210, hp: 440, range: 180, damage: 115, cooldown: 2.5, splash: 65, maxMines: 5 },
+      { cost: 170, hp: 300, range: 140, damage: 100, cooldown: 3.5, splash: 55, maxMines: 3 },
+      { cost: 130, hp: 370, range: 160, damage: 150, cooldown: 3.0, splash: 60, maxMines: 4 },
+      { cost: 210, hp: 440, range: 180, damage: 200, cooldown: 2.5, splash: 65, maxMines: 5 },
     ],
   },
   bastion: {
