@@ -123,6 +123,12 @@ export function sfx(name: string) {
       case 'spawn': if (gate('spawn', 200)) tick(260, 0.08, 0.1); break;
       case 'emp': if (gate('emp', 150)) { whoosh(0.35, 0.14, 1800, 300); } break;
       case 'zap': if (gate('zap', 90)) { tick(1500, 0.12, 0.07, 'sawtooth'); tick(2400, 0.07, 0.04, 'square'); } break;
+      case 'spray': if (gate('spray', 120)) whoosh(0.14, 0.08, 900, 2200); break;
+      case 'cryo': if (gate('cryo', 140)) { tick(2200, 0.08, 0.06, 'triangle'); tick(3300, 0.05, 0.08, 'sine'); } break;
+      case 'freeze': if (gate('freeze', 140)) { tick(1100, 0.1, 0.12, 'sine'); tick(2600, 0.06, 0.05, 'triangle'); } break;
+      case 'hex': boom(180, 0.4, 0.25, 0.4); tick(340, 0.16, 0.3, 'sine'); break;
+      case 'mine': boom(120, 0.45, 0.4, 0.9); break;
+      case 'minelay': if (gate('minelay', 200)) tick(480, 0.12, 0.08); break;
       case 'sting': if (gate('sting', 130)) tick(2900, 0.06, 0.03, 'triangle'); break;
       case 'drone': if (gate('drone', 180)) whoosh(0.22, 0.09, 700, 1900); break;
       case 'boomer': boom(95, 0.55, 0.45, 0.95); break;

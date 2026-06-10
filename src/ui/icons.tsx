@@ -104,6 +104,74 @@ function icon(kind: UnitKind) {
         <rect x="14" y="11" width="4" height="10" rx="1" fill={PAPER} />
         <rect x="11" y="14" width="10" height="4" rx="1" fill={PAPER} />
       </>);
+    case 'gunship':
+      return (<>
+        <rect x="7" y="10" width="17" height="12" rx="4" fill={RED} stroke={RED_D} strokeWidth="1.6" />
+        <rect x="14" y="10.6" width="13" height="2.6" rx="1.3" fill={INK} />
+        <rect x="14" y="18.8" width="13" height="2.6" rx="1.3" fill={INK} />
+        <circle cx="14" cy="16" r="3" fill={RED_D} />
+      </>);
+    case 'sniper':
+      return (<>
+        <rect x="4" y="11" width="15" height="10" rx="3" fill={RED} stroke={RED_D} strokeWidth="1.6" />
+        <rect x="12" y="14.6" width="17" height="2.8" rx="1.4" fill={INK} />
+        <rect x="25" y="13.4" width="3" height="5.2" rx="1.5" fill={RED_D} />
+        <circle cx="11" cy="16" r="3" fill={RED_D} />
+      </>);
+    case 'offroad':
+      return (<>
+        <circle cx="9" cy="9" r="3.4" fill={INK} />
+        <circle cx="23" cy="9" r="3.4" fill={INK} />
+        <circle cx="9" cy="23" r="3.4" fill={INK} />
+        <circle cx="23" cy="23" r="3.4" fill={INK} />
+        <rect x="7" y="10.5" width="18" height="11" rx="3.5" fill={RED} stroke={RED_D} strokeWidth="1.6" />
+        <path d="M 10 16 Q 13 14.5 16 16 T 22 16" fill="none" stroke={RED_D} strokeWidth="1.8" strokeLinecap="round" />
+      </>);
+    case 'seeker':
+      return (<>
+        <rect x="6" y="9" width="20" height="14" rx="4" fill={RED} stroke={RED_D} strokeWidth="1.6" />
+        <circle cx="14" cy="16" r="4.6" fill="none" stroke={PAPER} strokeWidth="1.8" />
+        <line x1="14" y1="10" x2="14" y2="22" stroke={PAPER} strokeWidth="1.5" />
+        <line x1="8.6" y1="16" x2="19.4" y2="16" stroke={PAPER} strokeWidth="1.5" />
+        <rect x="19" y="14.6" width="9" height="2.8" rx="1.4" fill={INK} />
+      </>);
+    case 'laser':
+      return (<>
+        <rect x="6" y="9" width="17" height="14" rx="4" fill={RED} stroke={RED_D} strokeWidth="1.6" />
+        <rect x="16" y="14.4" width="8" height="3.2" rx="1.6" fill={INK} />
+        <circle cx="25" cy="16" r="3.2" fill="#f2d23b" stroke={INK} strokeWidth="1.4" />
+      </>);
+    case 'disabler':
+      return (<>
+        <rect x="6" y="10" width="18" height="13" rx="4" fill={RED} stroke={RED_D} strokeWidth="1.6" />
+        <polyline points="13,5 17,9 13,12 17,15" fill="none" stroke={PAPER} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        <line x1="20" y1="11" x2="24" y2="6" stroke={INK} strokeWidth="2" strokeLinecap="round" />
+        <circle cx="25" cy="5.5" r="1.8" fill={RED_D} />
+      </>);
+    case 'lobber':
+      return (<>
+        <rect x="5" y="10" width="22" height="13" rx="4" fill={RED} stroke={RED_D} strokeWidth="1.8" />
+        <circle cx="13" cy="16.5" r="5" fill={RED_D} />
+        <rect x="13" y="12.5" width="13" height="8" rx="4" fill={INK} />
+        <circle cx="13" cy="16.5" r="2.6" fill={RED} />
+      </>);
+    case 'juggernaut':
+      return (<>
+        <rect x="4" y="7" width="24" height="18" rx="4" fill={RED} stroke={RED_D} strokeWidth="2" />
+        <rect x="8" y="10" width="5" height="12" rx="2" fill={RED_D} />
+        <rect x="15" y="10" width="5" height="12" rx="2" fill={RED_D} />
+        <rect x="17" y="11.5" width="12" height="2.8" rx="1.4" fill={INK} />
+        <rect x="17" y="17.7" width="12" height="2.8" rx="1.4" fill={INK} />
+      </>);
+    case 'behemoth':
+      return (<>
+        <polygon points="10,3 22,3 29,10 29,22 22,29 10,29 3,22 3,10" fill={RED} stroke={RED_D} strokeWidth="2" />
+        <polygon points="16,7 24,11.5 24,20.5 16,25 8,20.5 8,11.5" fill={RED_D} />
+        <rect x="15" y="9.5" width="14" height="2.8" rx="1.4" fill={INK} />
+        <rect x="15" y="14.6" width="15" height="2.8" rx="1.4" fill={RED} />
+        <rect x="15" y="19.7" width="14" height="2.8" rx="1.4" fill={INK} />
+        <circle cx="16" cy="16" r="3.6" fill="none" stroke={RED_L} strokeWidth="2" />
+      </>);
     case 'decoy':
       return (<>
         <rect
@@ -226,6 +294,54 @@ function towerIcon(kind: TowerKind) {
         <circle cx="16" cy="16" r="7" fill={BLUE} stroke={BLUE_D} strokeWidth="1.4" />
         <rect x="14.4" y="11" width="3.2" height="10" rx="1" fill={PAPER} />
         <rect x="11" y="14.4" width="10" height="3.2" rx="1" fill={PAPER} />
+      </>);
+    case 'lockon':
+      return (<>
+        <circle cx="14" cy="16" r="5.5" fill={BLUE} stroke={BLUE_D} strokeWidth="1.4" />
+        <rect x="15" y="14.8" width="9" height="2.4" rx="1.2" fill={INK} />
+        <circle cx="25" cy="16" r="2.8" fill="#f2d23b" stroke={INK} strokeWidth="1.3" />
+      </>);
+    case 'garage':
+      return (<>
+        <rect x="7" y="9" width="18" height="14" rx="2.5" fill={BLUE} stroke={BLUE_D} strokeWidth="1.4" />
+        <rect x="11" y="14" width="10" height="9" rx="1.5" fill={PAPER} />
+        <line x1="11" y1="17" x2="21" y2="17" stroke={INK} strokeWidth="1.2" />
+        <line x1="11" y1="20" x2="21" y2="20" stroke={INK} strokeWidth="1.2" />
+      </>);
+    case 'cryo':
+      return (<>
+        <circle cx="16" cy="16" r="6.5" fill={BLUE} stroke={BLUE_D} strokeWidth="1.4" />
+        <line x1="16" y1="10.5" x2="16" y2="21.5" stroke={PAPER} strokeWidth="1.8" strokeLinecap="round" />
+        <line x1="11.2" y1="13.2" x2="20.8" y2="18.8" stroke={PAPER} strokeWidth="1.8" strokeLinecap="round" />
+        <line x1="20.8" y1="13.2" x2="11.2" y2="18.8" stroke={PAPER} strokeWidth="1.8" strokeLinecap="round" />
+      </>);
+    case 'sprayer':
+      return (<>
+        <rect x="9.5" y="9.5" width="13" height="13" rx="3.5" fill={BLUE} stroke={BLUE_D} strokeWidth="1.4" />
+        <circle cx="13" cy="12.5" r="1.5" fill={PAPER} />
+        <circle cx="13" cy="16" r="1.5" fill={PAPER} />
+        <circle cx="13" cy="19.5" r="1.5" fill={PAPER} />
+        <circle cx="18.5" cy="12.5" r="1.5" fill={PAPER} />
+        <circle cx="18.5" cy="16" r="1.5" fill={PAPER} />
+        <circle cx="18.5" cy="19.5" r="1.5" fill={PAPER} />
+        <rect x="22" y="14.6" width="5" height="2.8" rx="1.4" fill={INK} />
+      </>);
+    case 'minelayer':
+      return (<>
+        <circle cx="16" cy="13" r="5.5" fill={BLUE} stroke={BLUE_D} strokeWidth="1.4" />
+        <circle cx="16" cy="23" r="4" fill={PAPER} stroke={INK} strokeWidth="1.4" />
+        <line x1="14.2" y1="21.2" x2="17.8" y2="24.8" stroke="#9b2f2a" strokeWidth="1.6" strokeLinecap="round" />
+        <line x1="17.8" y1="21.2" x2="14.2" y2="24.8" stroke="#9b2f2a" strokeWidth="1.6" strokeLinecap="round" />
+      </>);
+    case 'citadel':
+      return (<>
+        <rect x="7" y="7" width="18" height="18" rx="2.5" fill={BLUE} stroke={BLUE_D} strokeWidth="1.6" />
+        <circle cx="9.5" cy="9.5" r="2.2" fill={BLUE_D} />
+        <circle cx="22.5" cy="9.5" r="2.2" fill={BLUE_D} />
+        <circle cx="9.5" cy="22.5" r="2.2" fill={BLUE_D} />
+        <circle cx="22.5" cy="22.5" r="2.2" fill={BLUE_D} />
+        <circle cx="16" cy="16" r="4.4" fill={BLUE_D} stroke={PAPER} strokeWidth="1.4" />
+        <circle cx="16" cy="16" r="1.7" fill="#f2d23b" />
       </>);
   }
 }

@@ -1,12 +1,14 @@
 import {
-  SLOTS, SPAWN_INTERVAL, TOWERS, TOWER_LEVEL_VULN, UNITS,
+  BASE_POS, SLOTS, SPAWN_INTERVAL, TOWERS, TOWER_LEVEL_VULN, UNITS,
 } from './config';
 import { PATH_LENGTH, distance, pointAt } from './path';
 import type {
-  Projectile, SimEvent, Tank, Tower, TowerKind, UnitKind, Vec,
+  AttackSpec, Mine, Projectile, SimEvent, Sortie, Tank, Tower, TowerKind, UnitKind, Vec, WaveEntry,
 } from './types';
 
 const DT = 1 / 60;
+const SORTIE_SPEED = 85;
+const SORTIE_FIRE_RANGE = 150;
 
 let nextId = 1;
 function id() { return nextId++; }
@@ -15,9 +17,11 @@ export class Sim {
   tanks: Tank[] = [];
   towers: Tower[] = [];
   projectiles: Projectile[] = [];
+  sorties: Sortie[] = [];
+  mines: Mine[] = [];
   events: SimEvent[] = [];
 
-  waveQueue: UnitKind[] = [];
+  waveQueue: WaveEntry[] = [];
   spawnTimer = 0;
   waveActive = false;
 
@@ -35,7 +39,7 @@ export class Sim {
     const t: Tower = {
       id: id(), kind, level: 1, slot, pos: { ...SLOTS[slot] },
       hp: def.levels[0].hp, maxHp: def.levels[0].hp,
-      cooldown: 0.2, angle: -Math.PI / 2, suppressT: 0, recoil: 0,
+      cooldown: 0.2, angle: -Math.PI / 2, suppressT: 0, disableT: 0, recoil: 0,
       invested: def.levels[0].cost,
       dronesOut: 0, rechargeT: 0,
     };
@@ -74,13 +78,14 @@ export class Sim {
     if (i < 0) return 0;
     const refund = this.towers[i].invested;
     this.towers.splice(i, 1);
+    this.sorties = this.sorties.filter((s) => s.towerId !== towerId);
     this.events.push({ type: 'sfx', name: 'sell' });
     return refund;
   }
 
   // ---------- attacker API ----------
-  startWave(units: UnitKind[]) {
-    this.waveQueue = [...units];
+  startWave(entries: WaveEntry[]) {
+    this.waveQueue = [...entries];
     this.spawnTimer = 0.3;
     this.waveActive = true;
     this.clearOrdnance();
@@ -90,7 +95,12 @@ export class Sim {
       and fire off when the next wave began */
   private clearOrdnance() {
     this.projectiles = [];
-    for (const t of this.towers) { t.dronesOut = 0; t.rechargeT = 0; }
+    for (const t of this.towers) {
+      t.dronesOut = 0;
+      t.rechargeT = 0;
+      t.lockTank = undefined;
+      t.lockTank2 = undefined;
+    }
   }
 
   get waveDone(): boolean {
@@ -110,6 +120,11 @@ export class Sim {
   }
 
   private step(dt: number) {
+    // orphaned sorties (garage sold or destroyed) pack up
+    if (this.sorties.length > 0) {
+      this.sorties = this.sorties.filter((s) => this.towers.some((t) => t.id === s.towerId));
+    }
+
     if (!this.waveActive) {
       // idle board (build phases): towers track nothing, timers cool
       for (const t of this.towers) t.recoil = Math.max(0, t.recoil - dt * 4);
@@ -120,23 +135,25 @@ export class Sim {
     if (this.waveQueue.length > 0) {
       this.spawnTimer -= dt;
       if (this.spawnTimer <= 0) {
-        const kind = this.waveQueue.shift()!;
-        const def = UNITS[kind];
-        // gap sized so the follower never overlaps this unit, even slow heavies
+        const entry = this.waveQueue.shift()!;
+        const def = UNITS[entry.kind];
+        // gap sized so the follower never overlaps this unit
         const next = this.waveQueue[0];
         if (next) {
-          const ndef = UNITS[next];
+          const ndef = UNITS[next.kind];
           const gapPx = def.radius + ndef.radius + 10;
           const slower = Math.min(def.speed, ndef.speed);
           this.spawnTimer += Math.min(1.5, Math.max(SPAWN_INTERVAL, gapPx / slower));
         }
-        this.tanks.push(this.makeTank(kind, 0));
+        this.tanks.push(this.makeTank(entry.kind, 0, entry.targetTower));
         this.events.push({ type: 'sfx', name: 'spawn' });
       }
     }
 
     this.stepTanks(dt);
     this.stepTowers(dt);
+    this.stepSorties(dt);
+    this.stepMines();
     this.stepProjectiles(dt);
 
     if (this.spawnLater.length > 0) {
@@ -154,7 +171,7 @@ export class Sim {
     }
   }
 
-  private makeTank(kind: UnitKind, dist: number): Tank {
+  private makeTank(kind: UnitKind, dist: number, targetTower?: TowerKind): Tank {
     const def = UNITS[kind];
     const p = pointAt(dist);
     const phase = def.phase;
@@ -162,9 +179,12 @@ export class Sim {
       id: id(), kind, hp: def.hp, maxHp: def.hp, dist,
       pos: p.pos, angle: p.angle, turretAngle: p.angle, slow: { mult: 1, t: 0 },
       attackCd: def.attack ? def.attack.cooldown * 0.5 : 0,
+      attackCd2: def.attack2 ? def.attack2.cooldown * 0.5 : 0,
       interceptCd: def.intercept ? def.intercept.cooldown * 0.5 : 0,
       phaseT: phase ? Math.random() * phase.visibleT : 0,
       ghosted: false,
+      freezeT: 0,
+      preferredTower: targetTower,
       flash: 0, dead: false, leaked: false,
     };
   }
@@ -172,9 +192,16 @@ export class Sim {
   private stepTanks(dt: number) {
     for (const tank of this.tanks) {
       const def = UNITS[tank.kind];
+      tank.flash = Math.max(0, tank.flash - dt * 3);
+
+      // iced solid: no moving, no shooting — still very shootable
+      if (tank.freezeT > 0) {
+        tank.freezeT -= dt;
+        continue;
+      }
+
       if (tank.slow.t > 0) tank.slow.t -= dt;
       else tank.slow.mult = 1;
-      tank.flash = Math.max(0, tank.flash - dt * 3);
 
       // phantom: pulse in and out of reality
       if (def.phase) {
@@ -184,16 +211,53 @@ export class Sim {
       }
 
       const speed = def.speed * tank.slow.mult;
-      tank.dist += speed * dt;
 
-      const p = pointAt(tank.dist);
-      tank.pos = p.pos;
-      tank.angle = p.angle;
+      if (def.offroad) {
+        // straight across country, path be damned
+        if (tank.offStart === undefined) tank.offStart = distance(tank.pos, BASE_POS);
+        const a = Math.atan2(BASE_POS.y - tank.pos.y, BASE_POS.x - tank.pos.x);
+        tank.angle = a;
+        tank.pos = { x: tank.pos.x + Math.cos(a) * speed * dt, y: tank.pos.y + Math.sin(a) * speed * dt };
+        const remaining = distance(tank.pos, BASE_POS);
+        tank.dist = PATH_LENGTH * Math.max(0, 1 - remaining / Math.max(1, tank.offStart));
+        if (remaining < 36) {
+          tank.leaked = true;
+          this.events.push({ type: 'leak', damage: def.leakDamage, kind: tank.kind });
+          this.events.push({ type: 'sfx', name: 'leak' });
+          continue;
+        }
+      } else {
+        tank.dist += speed * dt;
+        const p = pointAt(tank.dist);
+        tank.pos = p.pos;
+        tank.angle = p.angle;
+        if (tank.dist >= PATH_LENGTH) {
+          tank.leaked = true;
+          this.events.push({ type: 'leak', damage: def.leakDamage, kind: tank.kind });
+          this.events.push({ type: 'sfx', name: 'leak' });
+          continue;
+        }
+      }
 
-      if (tank.dist >= PATH_LENGTH) {
-        tank.leaked = true;
-        this.events.push({ type: 'leak', damage: def.leakDamage, kind: tank.kind });
-        this.events.push({ type: 'sfx', name: 'leak' });
+      // laser tank: lock one tower and burn it down
+      if (def.lockon) {
+        let target = tank.lockTower !== undefined
+          ? this.towers.find((tw) => tw.id === tank.lockTower)
+          : undefined;
+        if (!target) {
+          let bd = def.lockon.range;
+          for (const tw of this.towers) {
+            const d = distance(tw.pos, tank.pos);
+            if (d < bd) { bd = d; target = tw; }
+          }
+          tank.lockTower = target?.id;
+        }
+        if (target) {
+          tank.turretAngle = Math.atan2(target.pos.y - tank.pos.y, target.pos.x - tank.pos.x);
+          if (distance(target.pos, tank.pos) <= def.lockon.range) {
+            this.hurtTower(target, def.lockon.dps * dt, target.pos, false, false);
+          }
+        }
         continue;
       }
 
@@ -206,35 +270,21 @@ export class Sim {
       }
       tank.turretAngle = lerpAngle(tank.turretAngle, aim, dt * 6);
 
-      // tank fire vs towers: bullets do damage, missiles do damage (+ suppress)
+      // tank fire vs towers
       if (def.attack) {
         tank.attackCd -= dt;
-        if (tank.attackCd <= 0) {
-          const atk = def.attack;
-          const targets = this.towers.filter((tw) => distance(tw.pos, tank.pos) <= atk.range);
-          targets.sort((a, b) => distance(a.pos, tank.pos) - distance(b.pos, tank.pos));
-          if (targets.length > 0) {
-            tank.attackCd = atk.cooldown;
-            const isMissile = atk.projectile === 'missile';
-            for (let v = 0; v < atk.volley; v++) {
-              const tw = targets[v % targets.length];
-              this.projectiles.push({
-                id: id(), kind: isMissile ? 'tankmissile' : 'tankbullet',
-                pos: { ...tank.pos },
-                vel: this.aimVel(tank.pos, tw.pos, isMissile ? 180 : 420, isMissile ? (v - 1) * 0.5 : 0.06),
-                speed: isMissile ? 180 : 420, turnRate: isMissile ? 4.5 : 9,
-                targetTower: tw.id, damage: atk.damage,
-                effect: atk.type ? { type: atk.type, duration: atk.duration ?? 1.5 } : undefined,
-                life: 5, dead: false,
-                wobblePhase: isMissile ? Math.random() * 7 : undefined,
-              });
-            }
-            this.events.push({ type: 'sfx', name: isMissile ? 'tanklaunch' : 'tankgun' });
-          }
+        if (tank.attackCd <= 0 && this.fireTankWeapon(tank, def.attack)) {
+          tank.attackCd = def.attack.cooldown;
+        }
+      }
+      if (def.attack2) {
+        tank.attackCd2 -= dt;
+        if (tank.attackCd2 <= 0 && this.fireTankWeapon(tank, def.attack2)) {
+          tank.attackCd2 = def.attack2.cooldown;
         }
       }
 
-      // flak: shoot defender missiles out of the sky
+      // flak/behemoth: shoot defender missiles out of the sky
       if (def.intercept) {
         tank.interceptCd -= dt;
         if (tank.interceptCd <= 0) {
@@ -244,7 +294,6 @@ export class Sim {
           );
           if (threat) {
             tank.interceptCd = def.intercept.cooldown;
-            tank.turretAngle = Math.atan2(threat.pos.y - tank.pos.y, threat.pos.x - tank.pos.x);
             this.projectiles.push({
               id: id(), kind: 'tankinterceptor',
               pos: { ...tank.pos }, vel: this.aimVel(tank.pos, threat.pos, 430),
@@ -268,6 +317,34 @@ export class Sim {
         }
       }
     }
+  }
+
+  /** fire one volley at towers in range; seekers only ever shoot their chosen prey */
+  private fireTankWeapon(tank: Tank, atk: AttackSpec): boolean {
+    let pool = this.towers;
+    if (tank.preferredTower) pool = pool.filter((tw) => tw.kind === tank.preferredTower);
+    const targets = pool.filter((tw) => distance(tw.pos, tank.pos) <= atk.range);
+    if (targets.length === 0) return false;
+    targets.sort((a, b) => distance(a.pos, tank.pos) - distance(b.pos, tank.pos));
+    const big = atk.projectile === 'bigmissile';
+    const isMissile = atk.projectile !== 'bullet';
+    for (let v = 0; v < atk.volley; v++) {
+      const tw = targets[v % targets.length];
+      this.projectiles.push({
+        id: id(),
+        kind: big ? 'tankbigmissile' : isMissile ? 'tankmissile' : 'tankbullet',
+        pos: { ...tank.pos },
+        vel: this.aimVel(tank.pos, tw.pos, big ? 150 : isMissile ? 180 : 420, isMissile ? (v - 1) * 0.5 : 0.06),
+        speed: big ? 200 : isMissile ? 180 : 420,
+        turnRate: big ? 3 : isMissile ? 4.5 : 9,
+        targetTower: tw.id, damage: atk.damage, splash: atk.splash,
+        effect: atk.type ? { type: atk.type, duration: atk.duration ?? 1.5 } : undefined,
+        life: big ? 7 : 5, dead: false,
+        wobblePhase: isMissile ? Math.random() * 7 : undefined,
+      });
+    }
+    this.events.push({ type: 'sfx', name: big ? 'bertha_launch' : isMissile ? 'tanklaunch' : 'tankgun' });
+    return true;
   }
 
   private aimVel(from: Vec, to: Vec, speed: number, spread = 0): Vec {
@@ -299,14 +376,17 @@ export class Sim {
   }
 
   /** tank fire hitting a tower: bastions soften it, upgrades make a fatter target */
-  private hurtTower(tw: Tower, dmg: number, hitPos: Vec, big: boolean) {
+  private hurtTower(tw: Tower, dmg: number, hitPos: Vec, big: boolean, fx = true) {
     const vuln = 1 + (tw.level - 1) * TOWER_LEVEL_VULN;
     tw.hp -= dmg * vuln * this.towerShieldMult(tw);
     if (tw.hp <= 0) {
       this.towers = this.towers.filter((x) => x.id !== tw.id);
+      this.sorties = this.sorties.filter((s) => s.towerId !== tw.id);
       this.events.push({ type: 'towerDestroyed', pos: { ...tw.pos }, towerId: tw.id });
       this.events.push({ type: 'explosion', pos: { ...tw.pos }, size: 50 });
       this.events.push({ type: 'sfx', name: 'towerdown' });
+    } else if (!fx) {
+      // silent (laser burn) — no per-tick explosion spam
     } else if (big) {
       this.events.push({ type: 'explosion', pos: { ...hitPos }, size: 22 });
       this.events.push({ type: 'sfx', name: 'tankhit' });
@@ -334,14 +414,38 @@ export class Sim {
     return bestTaunt ?? best;
   }
 
+  /** beam upkeep for lockon/citadel: hold the victim until it's gone */
+  private laserBurn(tw: Tower, range: number, dps: number, dt: number, beam: 1 | 2) {
+    const cur = beam === 1 ? tw.lockTank : tw.lockTank2;
+    let target = cur !== undefined ? this.tanks.find((t) => t.id === cur && !t.dead) : undefined;
+    if (!target) {
+      const exclude = beam === 1 ? tw.lockTank2 : tw.lockTank;
+      let bd = -1;
+      for (const t of this.tanks) {
+        if (!this.targetable(t) || t.id === exclude) continue;
+        if (distance(t.pos, tw.pos) > range) continue;
+        if (t.dist > bd) { bd = t.dist; target = t; }
+      }
+      if (beam === 1) tw.lockTank = target?.id;
+      else tw.lockTank2 = target?.id;
+    }
+    if (!target) return;
+    if (beam === 1) tw.angle = Math.atan2(target.pos.y - tw.pos.y, target.pos.x - tw.pos.x);
+    if (!target.ghosted && distance(target.pos, tw.pos) <= range) {
+      this.damageTank(target, dps * dt);
+    }
+  }
+
   private stepTowers(dt: number) {
     for (const tw of this.towers) {
       tw.recoil = Math.max(0, tw.recoil - dt * 4);
       tw.rechargeT = Math.max(0, tw.rechargeT - dt);
+      if (tw.disableT > 0) { tw.disableT -= dt; continue; } // hexed: lights out
       if (tw.suppressT > 0) tw.suppressT -= dt;
 
       const def = TOWERS[tw.kind];
       const lvl = def.levels[tw.level - 1];
+      const rate = tw.suppressT > 0 ? 0.4 : 1;
 
       if (tw.kind === 'bastion') continue; // pure support: the dome is passive
 
@@ -357,7 +461,62 @@ export class Sim {
         continue;
       }
 
-      const rate = tw.suppressT > 0 ? 0.4 : 1;
+      if (tw.kind === 'lockon') {
+        this.laserBurn(tw, lvl.range, (lvl.dps ?? 30) * rate, dt, 1);
+        continue;
+      }
+
+      if (tw.kind === 'citadel') {
+        // slow field
+        const pct = lvl.slowPct ?? 0.25;
+        for (const t of this.tanks) {
+          if (t.dead || distance(t.pos, tw.pos) > lvl.range) continue;
+          const resist = UNITS[t.kind].slowResist ?? 0;
+          t.slow.mult = Math.min(t.slow.mult, 1 - pct * (1 - resist));
+          t.slow.t = Math.max(t.slow.t, 0.3);
+        }
+        // twin lasers
+        this.laserBurn(tw, lvl.range, (lvl.dps ?? 25) * rate, dt, 1);
+        this.laserBurn(tw, lvl.range, (lvl.dps ?? 25) * rate, dt, 2);
+        // missile volleys
+        tw.cooldown -= dt * rate;
+        if (tw.cooldown <= 0) {
+          const target = this.pickTarget(tw, lvl.range);
+          if (target) {
+            tw.cooldown = lvl.cooldown;
+            tw.recoil = 1;
+            const volley = lvl.volley ?? 3;
+            for (let i = 0; i < volley; i++) {
+              const a = tw.angle + (i - (volley - 1) / 2) * 0.4;
+              this.projectiles.push({
+                id: id(), kind: 'missile',
+                pos: { x: tw.pos.x + Math.cos(a) * 16, y: tw.pos.y + Math.sin(a) * 16 },
+                vel: { x: Math.cos(a) * 180, y: Math.sin(a) * 180 },
+                speed: 330, turnRate: 6.5, targetTank: target.id,
+                damage: lvl.damage, life: 3.5, dead: false,
+                wobblePhase: Math.random() * 7,
+              });
+            }
+            this.events.push({ type: 'sfx', name: 'swarm' });
+          }
+        }
+        continue;
+      }
+
+      if (tw.kind === 'garage') {
+        // field the motor pool
+        const want = lvl.tanks ?? 1;
+        const mine = this.sorties.filter((s) => s.towerId === tw.id);
+        for (let i = mine.length; i < want; i++) {
+          this.sorties.push({
+            id: id(), towerId: tw.id,
+            pos: { x: tw.pos.x + (i - (want - 1) / 2) * 14, y: tw.pos.y + 6 },
+            angle: -Math.PI / 2, turretAngle: -Math.PI / 2, cooldown: 0.3 * (i + 1),
+          });
+        }
+        continue;
+      }
+
       tw.cooldown -= dt * rate;
       if (tw.cooldown > 0) {
         // keep tracking current target for visual continuity
@@ -390,10 +549,51 @@ export class Sim {
         continue;
       }
 
+      // minelayer: keep the road seeded
+      if (tw.kind === 'minelayer') {
+        const cap = lvl.maxMines ?? 3;
+        const own = this.mines.filter((m) => m.towerId === tw.id).length;
+        if (own < cap && this.placeMine(tw, lvl.range, lvl.damage, lvl.splash ?? 55)) {
+          tw.cooldown = lvl.cooldown;
+          tw.recoil = 1;
+          this.events.push({ type: 'sfx', name: 'minelay' });
+        } else {
+          tw.cooldown = 0.4;
+        }
+        continue;
+      }
+
+      // cryo: prefer tanks that aren't already iced
+      if (tw.kind === 'cryo') {
+        let target: Tank | undefined;
+        let bd = -1;
+        for (const t of this.tanks) {
+          if (!this.targetable(t) || t.freezeT > 0.3) continue;
+          if (distance(t.pos, tw.pos) > lvl.range) continue;
+          if (t.dist > bd) { bd = t.dist; target = t; }
+        }
+        if (!target) target = this.pickTarget(tw, lvl.range);
+        if (target) {
+          tw.cooldown = lvl.cooldown;
+          tw.recoil = 1;
+          tw.angle = Math.atan2(target.pos.y - tw.pos.y, target.pos.x - tw.pos.x);
+          this.projectiles.push({
+            id: id(), kind: 'cryoshot',
+            pos: { x: tw.pos.x + Math.cos(tw.angle) * 20, y: tw.pos.y + Math.sin(tw.angle) * 20 },
+            vel: this.aimVel(tw.pos, target.pos, 640),
+            speed: 640, turnRate: 9, targetTank: target.id,
+            damage: 0, freezeDur: lvl.freezeDur ?? 1.2, life: 1.5, dead: false,
+          });
+          this.events.push({ type: 'sfx', name: 'cryo' });
+        }
+        continue;
+      }
+
       // CIWS: intercept enemy missiles first
       if (tw.kind === 'ciws') {
         const threat = this.projectiles.find(
-          (p) => p.kind === 'tankmissile' && !p.dead && distance(p.pos, tw.pos) <= lvl.range,
+          (p) => (p.kind === 'tankmissile' || p.kind === 'tankbigmissile') && !p.dead
+            && distance(p.pos, tw.pos) <= lvl.range,
         );
         if (threat) {
           tw.cooldown = 1 / (lvl.interceptPerSec ?? 4);
@@ -460,6 +660,16 @@ export class Sim {
           });
           this.events.push({ type: 'sfx', name: 'rail' });
           break;
+        case 'sprayer':
+          this.projectiles.push({
+            id: id(), kind: 'minimissile', pos: muzzle,
+            vel: this.aimVel(tw.pos, target.pos, 240, 0.5),
+            speed: 380, turnRate: 7.5, targetTank: target.id,
+            damage: lvl.damage, life: 2.5, dead: false,
+            wobblePhase: Math.random() * 7,
+          });
+          this.events.push({ type: 'sfx', name: 'spray' });
+          break;
         case 'arc': {
           // chain lightning: instant, jumps to nearby targets with falloff
           const chains = lvl.chains ?? 3;
@@ -512,6 +722,86 @@ export class Sim {
           });
           this.events.push({ type: 'sfx', name: 'bertha_launch' });
           break;
+      }
+    }
+  }
+
+  /** garage tanks: drive off-road at the wave, shoot, fall back when it's quiet */
+  private stepSorties(dt: number) {
+    for (const s of this.sorties) {
+      const garage = this.towers.find((t) => t.id === s.towerId);
+      if (!garage) continue; // pruned next step
+      const lvl = TOWERS.garage.levels[garage.level - 1];
+      s.cooldown = Math.max(0, s.cooldown - dt);
+
+      // furthest-along tank inside the garage's operating radius
+      let target: Tank | undefined;
+      let bd = -1;
+      for (const t of this.tanks) {
+        if (!this.targetable(t)) continue;
+        if (distance(t.pos, garage.pos) > lvl.range) continue;
+        if (t.dist > bd) { bd = t.dist; target = t; }
+      }
+
+      if (target) {
+        const d = distance(target.pos, s.pos);
+        const a = Math.atan2(target.pos.y - s.pos.y, target.pos.x - s.pos.x);
+        s.turretAngle = lerpAngle(s.turretAngle, a, dt * 8);
+        if (d > SORTIE_FIRE_RANGE * 0.8) {
+          s.angle = lerpAngle(s.angle, a, dt * 5);
+          s.pos = { x: s.pos.x + Math.cos(s.angle) * SORTIE_SPEED * dt, y: s.pos.y + Math.sin(s.angle) * SORTIE_SPEED * dt };
+        }
+        if (d <= SORTIE_FIRE_RANGE && s.cooldown <= 0 && garage.disableT <= 0) {
+          s.cooldown = lvl.cooldown;
+          this.projectiles.push({
+            id: id(), kind: 'bullet',
+            pos: { ...s.pos }, vel: this.aimVel(s.pos, target.pos, 520),
+            speed: 520, turnRate: 8, targetTank: target.id,
+            damage: lvl.damage, life: 1.5, dead: false,
+          });
+          this.events.push({ type: 'sfx', name: 'gun' });
+        }
+      } else {
+        // roll home and park
+        const d = distance(garage.pos, s.pos);
+        if (d > 10) {
+          const a = Math.atan2(garage.pos.y - s.pos.y, garage.pos.x - s.pos.x);
+          s.angle = lerpAngle(s.angle, a, dt * 5);
+          s.turretAngle = lerpAngle(s.turretAngle, a, dt * 5);
+          s.pos = { x: s.pos.x + Math.cos(s.angle) * SORTIE_SPEED * dt, y: s.pos.y + Math.sin(s.angle) * SORTIE_SPEED * dt };
+        }
+      }
+    }
+  }
+
+  private placeMine(tw: Tower, range: number, damage: number, splash: number): boolean {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const d = Math.random() * PATH_LENGTH;
+      const p = pointAt(d).pos;
+      if (distance(p, tw.pos) > range) continue;
+      if (this.mines.some((m) => distance(m.pos, p) < 30)) continue;
+      this.mines.push({ id: id(), towerId: tw.id, pos: p, damage, splash });
+      return true;
+    }
+    return false;
+  }
+
+  private stepMines() {
+    for (const mine of [...this.mines]) {
+      const victim = this.tanks.find(
+        (t) => !t.dead && distance(t.pos, mine.pos) < 16 + UNITS[t.kind].radius * 0.4,
+      );
+      if (!victim) continue;
+      this.mines = this.mines.filter((m) => m.id !== mine.id);
+      this.events.push({ type: 'explosion', pos: { ...mine.pos }, size: 34 });
+      this.events.push({ type: 'sfx', name: 'mine' });
+      for (const t of this.tanks) {
+        if (t.dead) continue;
+        const d = distance(t.pos, mine.pos);
+        if (d <= mine.splash) {
+          const falloff = 1 - 0.5 * (d / mine.splash);
+          this.damageTank(t, mine.damage * falloff);
+        }
       }
     }
   }
@@ -586,7 +876,7 @@ export class Sim {
       if (p.targetTank !== undefined) {
         const t = this.tanks.find((x) => x.id === p.targetTank && this.targetable(x));
         if (t) targetPos = t.pos;
-        else if (p.kind === 'missile' || p.kind === 'bigmissile') {
+        else if (p.kind === 'missile' || p.kind === 'bigmissile' || p.kind === 'minimissile') {
           // retarget whoever is closest to the base
           const nt = this.furthestTank();
           if (nt) { p.targetTank = nt.id; targetPos = nt.pos; }
@@ -604,7 +894,7 @@ export class Sim {
         const cur = Math.atan2(p.vel.y, p.vel.x);
         let na = lerpAngle(cur, desired, Math.min(1, p.turnRate * dt));
         // wobble for small missiles
-        if (p.wobblePhase !== undefined && p.kind !== 'bigmissile') {
+        if (p.wobblePhase !== undefined && p.kind !== 'bigmissile' && p.kind !== 'tankbigmissile') {
           p.wobblePhase += dt * 14;
           na += Math.sin(p.wobblePhase) * 0.12;
         }
@@ -631,8 +921,25 @@ export class Sim {
           p.dead = true;
           if (p.effect?.type === 'suppress') {
             tw.suppressT = Math.max(tw.suppressT, p.effect.duration);
+          } else if (p.effect?.type === 'disable') {
+            tw.disableT = Math.max(tw.disableT, p.effect.duration);
+            this.events.push({ type: 'sfx', name: 'hex' });
           }
-          this.hurtTower(tw, p.damage, p.pos, p.kind === 'tankmissile');
+          if (p.splash) {
+            // lobber shell: the whole block feels it
+            this.events.push({ type: 'shockwave', pos: { ...p.pos }, radius: p.splash });
+            this.events.push({ type: 'explosion', pos: { ...p.pos }, size: 40 });
+            this.events.push({ type: 'sfx', name: 'bertha_hit' });
+            for (const t2 of [...this.towers]) {
+              const d = distance(t2.pos, p.pos);
+              if (d <= p.splash) {
+                const falloff = 1 - 0.5 * (d / p.splash);
+                this.hurtTower(t2, p.damage * falloff, t2.pos, false, t2.id === tw.id);
+              }
+            }
+          } else {
+            this.hurtTower(tw, p.damage, p.pos, p.kind === 'tankmissile');
+          }
         }
         continue;
       }
@@ -642,6 +949,12 @@ export class Sim {
         const hitR = p.kind === 'bigmissile' ? 18 : 12;
         if (t && distance(t.pos, p.pos) < hitR + UNITS[t.kind].radius * 0.5) {
           p.dead = true;
+          if (p.freezeDur) {
+            t.freezeT = Math.max(t.freezeT, p.freezeDur);
+            this.events.push({ type: 'pulse', pos: { ...t.pos }, radius: 26 });
+            this.events.push({ type: 'sfx', name: 'freeze' });
+            continue;
+          }
           if (p.splash) {
             this.events.push({ type: 'shockwave', pos: { ...p.pos }, radius: p.splash });
             this.events.push({ type: 'explosion', pos: { ...p.pos }, size: 46 });
@@ -658,7 +971,7 @@ export class Sim {
             this.damageTank(t, p.damage);
             this.events.push({
               type: 'explosion', pos: { ...p.pos },
-              size: p.kind === 'missile' ? 14 : p.kind === 'railshot' ? 20 : 8,
+              size: p.kind === 'missile' ? 14 : p.kind === 'minimissile' ? 9 : p.kind === 'railshot' ? 20 : 8,
             });
             if (p.kind === 'missile') this.events.push({ type: 'sfx', name: 'missile_hit' });
           }

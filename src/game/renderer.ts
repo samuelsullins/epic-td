@@ -43,14 +43,19 @@ export class Renderer {
   boardLayer = new Container();
   auraG = new Graphics();
   craterG = new Container();
+  mineLayer = new Container();
   towerLayer = new Container();
+  sortieLayer = new Container();
   tankLayer = new Container();
   statusG = new Graphics();
+  beamG = new Graphics();
   projLayer = new Container();
   fxLayer = new Container();
   rangeG = new Graphics();
 
   private tankViews = new Map<number, { root: Container; body: Sprite; turret: Sprite; hp: Container; hpFg: Sprite }>();
+  private sortieViews = new Map<number, { root: Container; body: Sprite; turret: Sprite }>();
+  private mineViews = new Map<number, Sprite>();
   private towerViews = new Map<number, { root: Container; turret: Sprite; hp: Container; hpFg: Sprite; level: number; kind: TowerKind; age: number }>();
   private projViews = new Map<number, { sp: Sprite; trailAcc: number }>();
   private fx: Fx[] = [];
@@ -91,8 +96,9 @@ export class Renderer {
     el.appendChild(this.app.canvas);
 
     this.world.addChild(
-      this.boardLayer, this.craterG, this.auraG, this.rangeG,
-      this.towerLayer, this.tankLayer, this.statusG, this.projLayer, this.fxLayer,
+      this.boardLayer, this.craterG, this.mineLayer, this.auraG, this.rangeG,
+      this.towerLayer, this.sortieLayer, this.tankLayer, this.statusG, this.beamG,
+      this.projLayer, this.fxLayer,
     );
     this.app.stage.addChild(this.world);
     this.buildSoftTexture();
@@ -333,6 +339,62 @@ export class Renderer {
           g.roundRect(-r * 0.16, -r * 0.45, r * 0.32, r * 0.9, 2).fill({ color: PAPER, alpha: 0.92 });
           g.roundRect(-r * 0.45, -r * 0.16, r * 0.9, r * 0.32, 2).fill({ color: PAPER, alpha: 0.92 });
           break;
+        case 'gunship':
+          g.roundRect(-r * 0.9, -r * 0.65, r * 1.8, r * 1.3, r * 0.4).fill(body);
+          sk.rect(g, -r * 0.9, -r * 0.65, r * 1.8, r * 1.3, line);
+          break;
+        case 'sniper':
+          g.roundRect(-r * 0.95, -r * 0.55, r * 1.9, r * 1.1, r * 0.3).fill(body);
+          sk.rect(g, -r * 0.95, -r * 0.55, r * 1.9, r * 1.1, line);
+          g.circle(-r * 0.4, 0, r * 0.28).fill({ color: RED_DARK });
+          break;
+        case 'offroad':
+          // big wheels instead of treads — built for the rough stuff
+          for (const [wx, wy] of [[-r * 0.6, -r * 0.85], [r * 0.6, -r * 0.85], [-r * 0.6, r * 0.85], [r * 0.6, r * 0.85]]) {
+            g.circle(wx, wy, r * 0.34).fill({ color: INK, alpha: 0.92 });
+          }
+          g.roundRect(-r * 0.9, -r * 0.6, r * 1.8, r * 1.2, r * 0.35).fill(body);
+          sk.rect(g, -r * 0.9, -r * 0.6, r * 1.8, r * 1.2, line);
+          sk.line(g, -r * 0.5, 0, r * 0.5, 0, { color: RED_DARK, width: 2, jitter: 1.4, overshoot: 1, passes: 1 });
+          break;
+        case 'seeker':
+          g.roundRect(-r * 0.95, -r * 0.7, r * 1.9, r * 1.4, r * 0.3).fill(body);
+          sk.rect(g, -r * 0.95, -r * 0.7, r * 1.9, r * 1.4, line);
+          // targeting reticle painted on the hull
+          sk.circle(g, -r * 0.35, 0, r * 0.32, { color: PAPER, width: 2, jitter: 0.5, passes: 1 });
+          sk.line(g, -r * 0.35, -r * 0.5, -r * 0.35, r * 0.5, { color: PAPER, width: 1.6, jitter: 0.4, overshoot: 0.5, passes: 1 });
+          break;
+        case 'laser':
+          g.roundRect(-r * 0.95, -r * 0.7, r * 1.9, r * 1.4, r * 0.3).fill(body);
+          sk.rect(g, -r * 0.95, -r * 0.7, r * 1.9, r * 1.4, line);
+          g.circle(-r * 0.4, 0, r * 0.3).fill({ color: 0xf2d23b });
+          break;
+        case 'disabler':
+          g.roundRect(-r * 0.9, -r * 0.68, r * 1.8, r * 1.36, r * 0.35).fill(body);
+          sk.rect(g, -r * 0.9, -r * 0.68, r * 1.8, r * 1.36, line);
+          // hex glyph
+          sk.poly(g, [-r * 0.4, -r * 0.3, 0, -r * 0.05, -r * 0.25, r * 0.1, r * 0.3, r * 0.4], false,
+            { color: PAPER, width: 2.2, jitter: 0.5, overshoot: 0.5, passes: 1 });
+          break;
+        case 'lobber':
+          g.roundRect(-r, -r * 0.75, r * 2, r * 1.5, r * 0.3).fill(body);
+          sk.rect(g, -r, -r * 0.75, r * 2, r * 1.5, { ...line, width: 2.6 });
+          g.circle(-r * 0.35, 0, r * 0.42).fill({ color: RED_DARK });
+          break;
+        case 'juggernaut':
+          g.roundRect(-r, -r * 0.8, r * 2, r * 1.6, r * 0.25).fill(body);
+          sk.rect(g, -r, -r * 0.8, r * 2, r * 1.6, { ...line, width: 2.8 });
+          g.roundRect(-r * 0.75, -r * 0.55, r * 0.6, r * 1.1, 3).fill({ color: RED_DARK, alpha: 0.9 });
+          g.roundRect(-r * 0.05, -r * 0.55, r * 0.6, r * 1.1, 3).fill({ color: RED_DARK, alpha: 0.9 });
+          break;
+        case 'behemoth':
+          g.poly(octPts(r)).fill(body);
+          sk.poly(g, octPts(r), true, { ...line, width: 3.2 });
+          g.poly(octPts(r * 0.68)).fill({ color: RED_DARK, alpha: 0.85 });
+          g.roundRect(-r * 1.02, -r * 0.6, r * 0.55, r * 0.4, 3).fill({ color: INK, alpha: 0.9 });
+          g.roundRect(-r * 1.02, r * 0.2, r * 0.55, r * 0.4, 3).fill({ color: INK, alpha: 0.9 });
+          sk.circle(g, 0, 0, r * 0.3, { color: 0xf4c7c3, width: 3, jitter: 0.8 });
+          break;
         case 'decoy':
           // a fake tank: pale fill, dashed outline, bullseye — clearly cardboard
           g.roundRect(-r * 0.9, -r * 0.68, r * 1.8, r * 1.36, r * 0.4).fill({ color: RED, alpha: 0.35 });
@@ -419,6 +481,58 @@ export class Renderer {
           // a little wrench arm
           g.roundRect(0, -2, r * 1.1, 4, 2).fill(barrel);
           sk.circle(g, r * 1.1, 0, r * 0.22, { color: INK, width: 2, jitter: 0.5, passes: 1 });
+          break;
+        case 'gunship':
+          // twin machine guns
+          g.circle(0, 0, r * 0.42).fill(cap);
+          g.roundRect(0, -r * 0.36, r * 1.45, 2.6, 1.3).fill(barrel);
+          g.roundRect(0, r * 0.36 - 2.6, r * 1.45, 2.6, 1.3).fill(barrel);
+          break;
+        case 'sniper':
+          // one absurdly long gun
+          g.circle(0, 0, r * 0.4).fill(cap);
+          g.roundRect(0, -2, r * 2.4, 4, 2).fill(barrel);
+          g.roundRect(r * 1.7, -3, r * 0.4, 6, 2).fill(cap);
+          break;
+        case 'offroad':
+          g.roundRect(0, -2.2, r * 1.3, 4.4, 2.2).fill(barrel);
+          g.circle(0, 0, r * 0.3).fill(cap);
+          break;
+        case 'seeker':
+          // single guided-missile rail
+          g.roundRect(0, -3.2, r * 1.6, 6.4, 3).fill(cap);
+          g.roundRect(r * 0.3, -1.6, r * 1.4, 3.2, 1.6).fill(barrel);
+          break;
+        case 'laser':
+          // lens on a stalk
+          g.roundRect(0, -2.4, r * 1.2, 4.8, 2.4).fill(barrel);
+          g.circle(r * 1.2, 0, r * 0.34).fill({ color: 0xf2d23b });
+          sk.circle(g, r * 1.2, 0, r * 0.34, { color: INK, width: 1.6, jitter: 0.4, passes: 1 });
+          break;
+        case 'disabler':
+          // antenna mast
+          g.roundRect(0, -1.6, r * 1.3, 3.2, 1.6).fill(barrel);
+          sk.circle(g, r * 1.3, 0, r * 0.28, { color: PAPER, width: 2, jitter: 0.5, passes: 1 });
+          break;
+        case 'lobber':
+          // fat stubby mortar tube
+          g.circle(0, 0, r * 0.5).fill(barrel);
+          g.roundRect(0, -5.5, r * 1.1, 11, 5).fill(barrel);
+          g.circle(0, 0, r * 0.3).fill(cap);
+          break;
+        case 'juggernaut':
+          g.roundRect(-r * 0.4, -r * 0.4, r * 0.8, r * 0.8, r * 0.2).fill(cap);
+          sk.rect(g, -r * 0.4, -r * 0.4, r * 0.8, r * 0.8, { color: INK, width: 1.8, jitter: 0.7, passes: 1 });
+          g.roundRect(0, -r * 0.34, r * 1.6, 5, 2.5).fill(barrel);
+          g.roundRect(0, r * 0.34 - 5, r * 1.6, 5, 2.5).fill(barrel);
+          break;
+        case 'behemoth':
+          g.poly(hexPts(r * 0.5)).fill(cap);
+          sk.poly(g, hexPts(r * 0.5), true, { color: INK, width: 2, jitter: 0.8, passes: 1 });
+          g.roundRect(0, -r * 0.36, r * 1.9, 8, 4).fill(barrel);
+          g.roundRect(0, r * 0.36 - 8, r * 1.9, 8, 4).fill(barrel);
+          g.roundRect(0, -2.2, r * 1.4, 4.4, 2.2).fill({ color: RED });
+          sk.circle(g, 0, 0, r * 0.26, { color: 0xf4c7c3, width: 3, jitter: 0.8 });
           break;
         case 'shield':
           g.circle(0, 0, r * 0.28).fill(cap);
@@ -549,6 +663,74 @@ export class Renderer {
           g.roundRect(-7.5 * s, -2.4 * s, 15 * s, 4.8 * s, 2).fill({ color: PAPER, alpha: 0.92 });
           break;
         }
+        case 'lockon': {
+          // dish with an amber lens and a long emitter
+          g.circle(0, 0, 11 * s).fill(body);
+          sk.circle(g, 0, 0, 11 * s, line);
+          g.roundRect(4, -2 * s, 26 * s, 4 * s, 2).fill(barrel);
+          g.circle(7 * s, 0, 4.2 * s).fill({ color: 0xf2d23b });
+          sk.circle(g, 7 * s, 0, 4.2 * s, { color: INK, width: 1.8, jitter: 0.5, passes: 1 });
+          break;
+        }
+        case 'garage': {
+          // a little shed: roofline + bay door
+          g.roundRect(-13 * s, -11 * s, 26 * s, 22 * s, 4).fill(body);
+          sk.rect(g, -13 * s, -11 * s, 26 * s, 22 * s, line);
+          sk.line(g, -13 * s, -3 * s, 13 * s, -3 * s, { color: BLUE_DARK, width: 2, jitter: 0.7, passes: 1 });
+          g.roundRect(-7 * s, -1 * s, 14 * s, 11 * s, 2).fill({ color: PAPER, alpha: 0.85 });
+          for (let i = 0; i < 3; i++) {
+            g.moveTo(-7 * s, (1.5 + i * 3) * s);
+            g.lineTo(7 * s, (1.5 + i * 3) * s);
+          }
+          g.stroke({ width: 1.4, color: INK, alpha: 0.6 });
+          break;
+        }
+        case 'cryo': {
+          g.circle(0, 0, 11 * s).fill(body);
+          sk.circle(g, 0, 0, 11 * s, line);
+          g.roundRect(4, -2.5 * s, 20 * s, 5 * s, 2.5).fill(barrel);
+          // snowflake
+          for (let i = 0; i < 3; i++) {
+            const a = (i / 3) * Math.PI;
+            g.moveTo(Math.cos(a) * -5.5 * s, Math.sin(a) * -5.5 * s);
+            g.lineTo(Math.cos(a) * 5.5 * s, Math.sin(a) * 5.5 * s);
+          }
+          g.stroke({ width: 2 * s, color: PAPER, alpha: 0.95, cap: 'round' });
+          break;
+        }
+        case 'sprayer': {
+          g.roundRect(-11 * s, -11 * s, 22 * s, 22 * s, 6).fill(body);
+          sk.rect(g, -11 * s, -11 * s, 22 * s, 22 * s, line);
+          for (const [px, py] of [[-5, -6], [-5, 0], [-5, 6], [3, -6], [3, 0], [3, 6]]) {
+            g.circle(px * s, py * s, 2.2 * s).fill({ color: PAPER });
+          }
+          g.roundRect(9 * s, -3 * s, 8 * s, 6 * s, 2).fill(barrel);
+          break;
+        }
+        case 'minelayer': {
+          g.circle(0, 0, 11 * s).fill(body);
+          sk.circle(g, 0, 0, 11 * s, line);
+          // dispenser chute out the back, with a mine on deck
+          g.roundRect(-16 * s, -4 * s, 10 * s, 8 * s, 2).fill(barrel);
+          g.circle(0, 0, 4 * s).fill({ color: PAPER });
+          sk.line(g, -2 * s, -2 * s, 2 * s, 2 * s, { color: RED_DARK, width: 1.8, jitter: 0.4, overshoot: 0.5, passes: 1 });
+          sk.line(g, 2 * s, -2 * s, -2 * s, 2 * s, { color: RED_DARK, width: 1.8, jitter: 0.4, overshoot: 0.5, passes: 1 });
+          break;
+        }
+        case 'citadel': {
+          // a fortress: corner turrets, central dome, twin emitters
+          g.roundRect(-15 * s, -15 * s, 30 * s, 30 * s, 5).fill(body);
+          sk.rect(g, -15 * s, -15 * s, 30 * s, 30 * s, { ...line, width: 2.6 });
+          for (const [px, py] of [[-11, -11], [11, -11], [-11, 11], [11, 11]]) {
+            g.circle(px * s, py * s, 4 * s).fill({ color: BLUE_DARK });
+          }
+          g.circle(0, 0, 8 * s).fill({ color: BLUE_DARK });
+          sk.circle(g, 0, 0, 8 * s, { color: PAPER, width: 2, jitter: 0.6, passes: 1, alpha: 0.85 });
+          g.circle(0, 0, 3 * s).fill({ color: 0xf2d23b });
+          g.roundRect(8 * s, -6 * s, 12 * s, 3.4 * s, 1.7).fill(barrel);
+          g.roundRect(8 * s, 2.6 * s, 12 * s, 3.4 * s, 1.7).fill(barrel);
+          break;
+        }
       }
     });
   }
@@ -590,6 +772,21 @@ export class Renderer {
           break;
         case 'tankinterceptor':
           g.roundRect(-4, -1.4, 8, 2.8, 1.4).fill({ color: RED_DARK });
+          break;
+        case 'minimissile':
+          g.roundRect(-4, -1.8, 8, 3.6, 1.8).fill({ color: BLUE });
+          g.poly([4, -1.8, 6.5, 0, 4, 1.8]).fill({ color: INK });
+          break;
+        case 'cryoshot':
+          g.roundRect(-7, -2, 14, 4, 2).fill({ color: 0x7db8e8 });
+          g.roundRect(-7, -0.8, 14, 1.6, 0.8).fill({ color: 0xddeefb, alpha: 0.95 });
+          break;
+        case 'tankbigmissile':
+          g.roundRect(-16, -6, 32, 12, 6).fill({ color: RED });
+          g.poly([16, -6, 25, 0, 16, 6]).fill({ color: INK });
+          g.poly([-16, -6, -24, -11, -16, 0]).fill({ color: RED_DARK });
+          g.poly([-16, 6, -24, 11, -16, 0]).fill({ color: RED_DARK });
+          g.roundRect(-8, -6, 4, 12, 2).fill({ color: PAPER, alpha: 0.8 });
           break;
         case 'drone':
           // a fat little bee, nose +x
@@ -924,7 +1121,7 @@ export class Renderer {
       v.turret.rotation = tw.angle;
       const rec = tw.recoil * 5;
       v.turret.position.set(-Math.cos(tw.angle) * rec, -Math.sin(tw.angle) * rec);
-      v.root.alpha = tw.suppressT > 0 ? 0.7 : 1;
+      v.root.alpha = tw.disableT > 0 ? 0.45 : tw.suppressT > 0 ? 0.7 : 1;
       const hpFrac = tw.hp / tw.maxHp;
       v.hp.visible = hpFrac < 1;
       v.hpFg.width = 36 * Math.max(0, hpFrac);
@@ -936,11 +1133,92 @@ export class Renderer {
       }
     }
 
-    // status overlay: slow marks on tanks, suppression on towers
+    // garage sorties
+    const liveSorties = new Set<number>();
+    for (const s of sim.sorties) {
+      liveSorties.add(s.id);
+      let v = this.sortieViews.get(s.id);
+      if (!v) {
+        const root = new Container();
+        const body = new Sprite(this.texture('sortie_body', (g) => this.drawSortieBody(g)));
+        body.anchor.set(0.5);
+        const turret = new Sprite(this.texture('sortie_turret', (g) => this.drawSortieTurret(g)));
+        turret.anchor.set(0.5);
+        root.addChild(body, turret);
+        this.sortieLayer.addChild(root);
+        v = { root, body, turret };
+        this.sortieViews.set(s.id, v);
+      }
+      v.root.position.set(s.pos.x, s.pos.y);
+      v.body.rotation = s.angle;
+      v.turret.rotation = s.turretAngle;
+    }
+    for (const [sid, v] of this.sortieViews) {
+      if (!liveSorties.has(sid)) {
+        v.root.destroy({ children: true });
+        this.sortieViews.delete(sid);
+      }
+    }
+
+    // mines
+    const liveMines = new Set<number>();
+    for (const m of sim.mines) {
+      liveMines.add(m.id);
+      if (!this.mineViews.has(m.id)) {
+        const sp = new Sprite(this.texture('mine', (g) => {
+          const sk = sketcher('mine');
+          g.circle(0, 0, 8).fill({ color: PAPER });
+          sk.circle(g, 0, 0, 8, { color: INK, width: 2, jitter: 0.8 });
+          sk.line(g, -3.5, -3.5, 3.5, 3.5, { color: RED_DARK, width: 2.2, jitter: 0.5, overshoot: 1, passes: 1 });
+          sk.line(g, 3.5, -3.5, -3.5, 3.5, { color: RED_DARK, width: 2.2, jitter: 0.5, overshoot: 1, passes: 1 });
+        }));
+        sp.anchor.set(0.5);
+        sp.position.set(m.pos.x, m.pos.y);
+        this.mineLayer.addChild(sp);
+        this.mineViews.set(m.id, sp);
+      }
+    }
+    for (const [mid, sp] of this.mineViews) {
+      if (!liveMines.has(mid)) {
+        sp.destroy();
+        this.mineViews.delete(mid);
+      }
+    }
+
+    // laser beams: defender lock-ons (blue) and laser tanks (red)
+    this.beamG.clear();
+    for (const tw of sim.towers) {
+      if ((tw.kind !== 'lockon' && tw.kind !== 'citadel') || tw.disableT > 0) continue;
+      const lvl = TOWERS[tw.kind].levels[tw.level - 1];
+      for (const lockId of [tw.lockTank, tw.lockTank2]) {
+        if (lockId === undefined) continue;
+        const t = sim.tanks.find((x) => x.id === lockId && !x.dead && !x.ghosted);
+        if (!t) continue;
+        const d = Math.hypot(t.pos.x - tw.pos.x, t.pos.y - tw.pos.y);
+        if (d > lvl.range) continue;
+        this.beam(tw.pos, t.pos, BLUE);
+      }
+    }
+    for (const tank of sim.tanks) {
+      const lock = UNITS[tank.kind].lockon;
+      if (!lock || tank.freezeT > 0 || tank.lockTower === undefined) continue;
+      const tw = sim.towers.find((x) => x.id === tank.lockTower);
+      if (!tw) continue;
+      const d = Math.hypot(tw.pos.x - tank.pos.x, tw.pos.y - tank.pos.y);
+      if (d > lock.range) continue;
+      this.beam(tank.pos, tw.pos, RED);
+    }
+
+    // status overlay: slow/freeze marks on tanks, suppression/disable on towers
     this.statusG.clear();
     for (const tank of sim.tanks) {
       const r = UNITS[tank.kind].radius;
-      if (tank.slow.t > 0 && tank.slow.mult < 1) {
+      if (tank.freezeT > 0) {
+        // iced: a frosty ring
+        this.statusG.circle(tank.pos.x, tank.pos.y, r + 6)
+          .stroke({ width: 2.5, color: 0x7db8e8, alpha: 0.85 });
+        this.statusG.circle(tank.pos.x, tank.pos.y, r + 2).fill({ color: 0xbfdcf5, alpha: 0.25 });
+      } else if (tank.slow.t > 0 && tank.slow.mult < 1) {
         // blue "chill" ticks above a slowed tank
         for (let k = -1; k <= 1; k++) {
           const x = tank.pos.x + k * 8;
@@ -955,6 +1233,14 @@ export class Renderer {
     }
     for (const tw of sim.towers) {
       if (tw.suppressT > 0) this.zigzag(tw.pos.x, tw.pos.y - 40, INK, 0.8);
+      if (tw.disableT > 0) {
+        // hexed: a red X over the whole tower
+        this.statusG.moveTo(tw.pos.x - 13, tw.pos.y - 13);
+        this.statusG.lineTo(tw.pos.x + 13, tw.pos.y + 13);
+        this.statusG.moveTo(tw.pos.x + 13, tw.pos.y - 13);
+        this.statusG.lineTo(tw.pos.x - 13, tw.pos.y + 13);
+        this.statusG.stroke({ width: 3.5, color: RED, alpha: 0.85, cap: 'round' });
+      }
     }
 
     // projectiles
@@ -973,20 +1259,21 @@ export class Renderer {
       v.sp.position.set(p.pos.x, p.pos.y);
       v.sp.rotation = Math.atan2(p.vel.y, p.vel.x);
       // exhaust trails
-      const isMissile = p.kind === 'missile' || p.kind === 'bigmissile' || p.kind === 'tankmissile';
+      const isBig = p.kind === 'bigmissile' || p.kind === 'tankbigmissile';
+      const isMissile = isBig || p.kind === 'missile' || p.kind === 'tankmissile' || p.kind === 'minimissile';
       if (isMissile) {
         v.trailAcc += dt;
-        const gap = p.kind === 'bigmissile' ? 0.016 : 0.03;
+        const gap = isBig ? 0.016 : 0.03;
         while (v.trailAcc > gap) {
           v.trailAcc -= gap;
-          const back = p.kind === 'bigmissile' ? 18 : 8;
+          const back = isBig ? 18 : 8;
           const a = Math.atan2(p.vel.y, p.vel.x);
           this.spawnParticle(
             { x: p.pos.x - Math.cos(a) * back, y: p.pos.y - Math.sin(a) * back },
             -Math.cos(a) * 20 + (Math.random() - 0.5) * 22,
             -Math.sin(a) * 20 + (Math.random() - 0.5) * 22,
-            p.kind === 'bigmissile' ? 0.65 : 0.4,
-            p.kind === 'bigmissile' ? 0.9 : 0.38,
+            isBig ? 0.65 : 0.4,
+            isBig ? 0.9 : 0.38,
             0xc4c9cf,
           );
         }
@@ -1046,6 +1333,34 @@ export class Renderer {
       this.shake = 0;
       this.world.position.set(this.offX, this.offY);
     }
+  }
+
+  /** a marker-drawn laser: soft wide stroke with a hot core and an impact dot */
+  private beam(from: Vec, to: Vec, color: number) {
+    this.beamG.moveTo(from.x, from.y);
+    this.beamG.lineTo(to.x, to.y);
+    this.beamG.stroke({ width: 5, color, alpha: 0.28, cap: 'round' });
+    this.beamG.moveTo(from.x, from.y);
+    this.beamG.lineTo(to.x, to.y);
+    this.beamG.stroke({ width: 1.8, color, alpha: 0.9, cap: 'round' });
+    this.beamG.circle(to.x, to.y, 5).fill({ color, alpha: 0.55 });
+  }
+
+  /** garage sortie tank: a compact blue heavy */
+  private drawSortieBody(g: Graphics) {
+    const sk = sketcher('sortie_body');
+    const r = 14;
+    g.roundRect(-r, -r * 0.95, r * 2, r * 0.55, r * 0.25).fill({ color: INK, alpha: 0.92 });
+    g.roundRect(-r, r * 0.4, r * 2, r * 0.55, r * 0.25).fill({ color: INK, alpha: 0.92 });
+    g.roundRect(-r * 0.95, -r * 0.7, r * 1.9, r * 1.4, r * 0.3).fill({ color: BLUE, alpha: 0.9 });
+    sk.rect(g, -r * 0.95, -r * 0.7, r * 1.9, r * 1.4, { color: BLUE_DARK, width: 2, jitter: 0.9 });
+  }
+
+  private drawSortieTurret(g: Graphics) {
+    const r = 14;
+    g.circle(0, 0, r * 2.1).fill({ color: 0xffffff, alpha: 0.003 });
+    g.circle(0, 0, r * 0.48).fill({ color: BLUE_DARK });
+    g.roundRect(0, -3, r * 1.6, 6, 3).fill({ color: INK, alpha: 0.95 });
   }
 
   /** small static zigzag (suppression smoke / jammer static) over a tower */

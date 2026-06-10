@@ -6,7 +6,7 @@ import {
 import { Renderer } from '../game/renderer';
 import { Sim } from '../game/sim';
 import { sfx } from '../game/audio';
-import type { Phase, TowerKind, UnitKind } from '../game/types';
+import type { Phase, TowerKind, UnitKind, WaveEntry } from '../game/types';
 
 export const sim = new Sim();
 export const renderer = new Renderer();
@@ -33,7 +33,7 @@ interface GameState {
   atkBricks: number;
 
   // wave draft (attacker)
-  draft: UnitKind[];
+  draft: WaveEntry[];
 
   // combat
   speed: number;
@@ -55,7 +55,7 @@ interface GameState {
   beginRound: () => void;
   defenderReady: () => void;
   attackerArrived: () => void;
-  addUnit: (k: UnitKind) => void;
+  addUnit: (k: UnitKind, targetTower?: TowerKind) => void;
   removeUnit: (index: number) => void;
   clearDraft: () => void;
   launchWave: () => void;
@@ -79,8 +79,8 @@ export function repairCost(hp: number, maxHp: number, invested: number): number 
 let pendingEnd: { kind: 'defeat' } | { kind: 'wave'; summary: SummaryData } | null = null;
 let pendingAt = 0;
 
-function draftCost(draft: UnitKind[]): number {
-  return draft.reduce((s, k) => s + UNITS[k].cost, 0);
+function draftCost(draft: WaveEntry[]): number {
+  return draft.reduce((s, e) => s + UNITS[e.kind].cost, 0);
 }
 
 function updateRangePreview(state: { phase: Phase; selection: Selection }) {
@@ -124,6 +124,8 @@ export const useGame = create<GameState>((set, get) => ({
     sim.tanks = [];
     sim.towers = [];
     sim.projectiles = [];
+    sim.sorties = [];
+    sim.mines = [];
     sim.waveQueue = [];
     sim.waveActive = false;
     pendingEnd = null;
@@ -170,13 +172,13 @@ export const useGame = create<GameState>((set, get) => ({
     sfx('ui');
   },
 
-  addUnit: (k) => {
+  addUnit: (k, targetTower) => {
     const { draft, atkBricks } = get();
     const def = UNITS[k];
-    if (def.maxPerWave && draft.filter((d) => d === k).length >= def.maxPerWave) { sfx('ui_deny'); return; }
+    if (def.maxPerWave && draft.filter((d) => d.kind === k).length >= def.maxPerWave) { sfx('ui_deny'); return; }
     const cost = draftCost(draft) + def.cost;
     if (cost > atkBricks) { sfx('ui_deny'); return; }
-    set({ draft: [...draft, k] });
+    set({ draft: [...draft, { kind: k, targetTower }] });
     sfx('ui_add');
   },
 

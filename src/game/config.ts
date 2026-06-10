@@ -36,14 +36,19 @@ export function defenderCatchUp(lives: number): number {
 
 // ---------------- units ----------------
 // Everything is buyable from round 1 — prices are the gate.
-// Attack cadence: lots of small shots. Damage × cooldown preserved from the
-// old single-shot values, just delivered twice as often at half strength.
+// All tanks roll at the same speed: the wave IS the formation.
 export const UNITS: Record<UnitKind, UnitDef> = {
   scout: {
     kind: 'scout', name: 'Scout', cost: 10, tonnage: 1, hp: 70, speed: 60,
     leakDamage: 1, bounty: 3, unlockRound: 1, radius: 13,
     desc: 'Cheap and fast. Pecks at towers with a light gun.',
     attack: { damage: 2, range: 115, cooldown: 0.75, volley: 1, projectile: 'bullet' },
+  },
+  gunship: {
+    kind: 'gunship', name: 'Gunship', cost: 22, tonnage: 1, hp: 130, speed: 60,
+    leakDamage: 1, bounty: 6, unlockRound: 1, radius: 14,
+    desc: 'Two turrets, both machine-gunning. A small angry hose of bullets.',
+    attack: { damage: 2, range: 130, cooldown: 0.35, volley: 2, projectile: 'bullet' },
   },
   brawler: {
     kind: 'brawler', name: 'Brawler', cost: 18, tonnage: 2, hp: 190, speed: 60,
@@ -56,6 +61,12 @@ export const UNITS: Record<UnitKind, UnitDef> = {
     leakDamage: 1, bounty: 10, unlockRound: 1, radius: 16,
     desc: 'Long-range missile sniper. Cracks towers open from afar.',
     attack: { damage: 17, range: 185, cooldown: 2.25, volley: 1, projectile: 'missile' },
+  },
+  sniper: {
+    kind: 'sniper', name: 'Longshot', cost: 34, tonnage: 2, hp: 160, speed: 60,
+    leakDamage: 1, bounty: 10, unlockRound: 1, radius: 15,
+    desc: 'One very long gun. Big slow shells from outside most towers’ reach.',
+    attack: { damage: 30, range: 270, cooldown: 3.2, volley: 1, projectile: 'bullet' },
   },
   heavy: {
     kind: 'heavy', name: 'Heavy', cost: 38, tonnage: 3, hp: 540, speed: 60,
@@ -104,11 +115,41 @@ export const UNITS: Record<UnitKind, UnitDef> = {
     phase: { visibleT: 2.2, hiddenT: 1.4 },
     desc: 'Pulses invisible — towers can’t aim at what isn’t there. Splash still hurts it.',
   },
+  offroad: {
+    kind: 'offroad', name: 'Mudslinger', cost: 60, tonnage: 2, hp: 340, speed: 60,
+    leakDamage: 2, bounty: 14, unlockRound: 1, radius: 17, offroad: true,
+    desc: 'Ignores the road entirely — drives straight across country for the base.',
+    attack: { damage: 3, range: 120, cooldown: 1.2, volley: 1, projectile: 'bullet' },
+  },
+  seeker: {
+    kind: 'seeker', name: 'Seeker', cost: 38, tonnage: 2, hp: 220, speed: 60,
+    leakDamage: 1, bounty: 10, unlockRound: 1, radius: 16, pickTower: true,
+    desc: 'You choose its prey: guided missiles for ONE tower type, nothing else.',
+    attack: { damage: 30, range: 230, cooldown: 3, volley: 1, projectile: 'missile' },
+  },
+  laser: {
+    kind: 'laser', name: 'Optic', cost: 55, tonnage: 2, hp: 260, speed: 60,
+    leakDamage: 1, bounty: 13, unlockRound: 1, radius: 16,
+    lockon: { range: 320, dps: 16 },
+    desc: 'Locks its laser onto one tower and never blinks until it’s slag.',
+  },
+  disabler: {
+    kind: 'disabler', name: 'Hexer', cost: 48, tonnage: 2, hp: 240, speed: 60,
+    leakDamage: 1, bounty: 12, unlockRound: 1, radius: 16,
+    desc: 'Curse missiles: no damage, but the tower blacks out for a moment.',
+    attack: { type: 'disable', damage: 0, range: 200, cooldown: 5, duration: 2.5, volley: 1, projectile: 'missile' },
+  },
   mortar: {
     kind: 'mortar', name: 'Mortar Crawler', cost: 52, tonnage: 3, hp: 240, speed: 60,
     leakDamage: 2, bounty: 17, unlockRound: 1, radius: 18,
     desc: 'Lobs suppression shells that slow a tower’s fire rate.',
     attack: { type: 'suppress', damage: 14, range: 235, cooldown: 2.75, duration: 1.5, volley: 1, projectile: 'missile' },
+  },
+  lobber: {
+    kind: 'lobber', name: 'Lobber', cost: 75, tonnage: 3, hp: 380, speed: 60,
+    leakDamage: 2, bounty: 20, unlockRound: 1, radius: 19,
+    desc: 'A Bertha on treads. Great big missiles, great big splash.',
+    attack: { damage: 70, range: 240, cooldown: 5, volley: 1, projectile: 'bigmissile', splash: 70 },
   },
   mechanic: {
     kind: 'mechanic', name: 'Mechanic', cost: 48, tonnage: 3, hp: 260, speed: 60,
@@ -116,11 +157,25 @@ export const UNITS: Record<UnitKind, UnitDef> = {
     healAura: { radius: 95, hps: 10 },
     desc: 'Field repairs on the move. Keeps the column rolling.',
   },
+  juggernaut: {
+    kind: 'juggernaut', name: 'Juggernaut', cost: 90, tonnage: 5, hp: 1200, speed: 60,
+    leakDamage: 3, bounty: 28, unlockRound: 1, radius: 22,
+    desc: 'Mini-boss. Twin autocannons and far too much armor.',
+    attack: { damage: 6, range: 150, cooldown: 0.5, volley: 2, projectile: 'bullet' },
+  },
   goliath: {
     kind: 'goliath', name: 'GOLIATH', cost: 130, tonnage: 6, hp: 1900, speed: 60,
     leakDamage: 4, bounty: 40, unlockRound: 1, radius: 26,
     desc: 'Boss. Volleys of heavy missiles. A rolling fortress.',
     attack: { damage: 17.5, range: 200, cooldown: 3.5, volley: 3, projectile: 'missile' },
+  },
+  behemoth: {
+    kind: 'behemoth', name: 'BEHEMOTH', cost: 380, tonnage: 10, hp: 6500, speed: 60,
+    leakDamage: 10, bounty: 100, unlockRound: 1, radius: 34,
+    desc: 'The ultimate boss: constant light missiles, periodic heavy ones, and its own missile-downing gun.',
+    attack: { damage: 8, range: 190, cooldown: 0.8, volley: 1, projectile: 'missile' },
+    attack2: { damage: 45, range: 220, cooldown: 4, volley: 1, projectile: 'missile' },
+    intercept: { range: 170, cooldown: 3.5 },
   },
   leviathan: {
     kind: 'leviathan', name: 'LEVIATHAN', cost: 270, tonnage: 10, hp: 5000, speed: 60,
@@ -132,8 +187,9 @@ export const UNITS: Record<UnitKind, UnitDef> = {
 };
 
 export const UNIT_ORDER: UnitKind[] = [
-  'scout', 'brawler', 'hunter', 'heavy', 'boomer', 'decoy', 'shield',
-  'splitter', 'flak', 'phantom', 'mortar', 'mechanic', 'goliath', 'leviathan',
+  'scout', 'gunship', 'brawler', 'decoy', 'boomer', 'hunter', 'splitter', 'sniper',
+  'phantom', 'heavy', 'seeker', 'flak', 'shield', 'disabler', 'mechanic', 'mortar',
+  'laser', 'offroad', 'lobber', 'juggernaut', 'goliath', 'leviathan', 'behemoth',
 ];
 
 // ---------------- towers ----------------
@@ -156,6 +212,15 @@ export const TOWERS: Record<TowerKind, TowerDef> = {
       { cost: 190, hp: 400, range: 195, damage: 16, cooldown: 1.35, volley: 10 },
     ],
   },
+  sprayer: {
+    kind: 'sprayer', name: 'Hornet Nest', short: 'HORNET', projectile: 'minimissile',
+    desc: 'A constant stream of little missiles. Never stops humming.',
+    levels: [
+      { cost: 190, hp: 280, range: 170, damage: 7, cooldown: 0.22 },
+      { cost: 140, hp: 340, range: 185, damage: 9, cooldown: 0.2 },
+      { cost: 230, hp: 400, range: 200, damage: 12, cooldown: 0.18 },
+    ],
+  },
   arc: {
     kind: 'arc', name: 'Arc Coil', short: 'ARC', projectile: 'zap',
     desc: 'Chain lightning. Made for mobs.',
@@ -174,6 +239,15 @@ export const TOWERS: Record<TowerKind, TowerDef> = {
       { cost: 220, hp: 380, range: 275, damage: 220, cooldown: 1.45 },
     ],
   },
+  lockon: {
+    kind: 'lockon', name: 'Death Ray', short: 'LASER', projectile: 'laser',
+    desc: 'Locks one tank and burns until it dies. Sees almost the whole board.',
+    levels: [
+      { cost: 220, hp: 260, range: 420, damage: 0, cooldown: 99, dps: 30 },
+      { cost: 170, hp: 320, range: 460, damage: 0, cooldown: 99, dps: 46 },
+      { cost: 260, hp: 380, range: 500, damage: 0, cooldown: 99, dps: 68 },
+    ],
+  },
   emp: {
     kind: 'emp', name: 'EMP Coil', short: 'EMP', projectile: 'pulse',
     desc: 'Pulses that slow everything nearby.',
@@ -181,6 +255,15 @@ export const TOWERS: Record<TowerKind, TowerDef> = {
       { cost: 130, hp: 260, range: 110, damage: 0, cooldown: 1.85, slowPct: 0.4, slowDur: 1.6 },
       { cost: 100, hp: 320, range: 122, damage: 0, cooldown: 1.75, slowPct: 0.5, slowDur: 2.0 },
       { cost: 170, hp: 380, range: 134, damage: 0, cooldown: 1.6, slowPct: 0.6, slowDur: 2.4 },
+    ],
+  },
+  cryo: {
+    kind: 'cryo', name: 'Freeze Ray', short: 'CRYO', projectile: 'cryoshot',
+    desc: 'No damage — the hit tank just stops. Wheels, guns, everything.',
+    levels: [
+      { cost: 140, hp: 260, range: 150, damage: 0, cooldown: 2.0, freezeDur: 1.2 },
+      { cost: 110, hp: 320, range: 165, damage: 0, cooldown: 1.8, freezeDur: 1.5 },
+      { cost: 170, hp: 380, range: 180, damage: 0, cooldown: 1.6, freezeDur: 1.8 },
     ],
   },
   bertha: {
@@ -201,6 +284,15 @@ export const TOWERS: Record<TowerKind, TowerDef> = {
       { cost: 190, hp: 400, range: 195, damage: 15, cooldown: 0.23, drones: 5, stings: 5 },
     ],
   },
+  garage: {
+    kind: 'garage', name: 'Motor Pool', short: 'GARAGE', projectile: 'sortie',
+    desc: 'Houses heavy tanks that sortie out, off-road, and shoot back.',
+    levels: [
+      { cost: 200, hp: 420, range: 240, damage: 7, cooldown: 0.55, tanks: 1 },
+      { cost: 150, hp: 520, range: 280, damage: 8, cooldown: 0.5, tanks: 3 },
+      { cost: 240, hp: 620, range: 320, damage: 9, cooldown: 0.45, tanks: 5 },
+    ],
+  },
   ciws: {
     kind: 'ciws', name: 'Point Defense', short: 'CIWS', projectile: 'beam', maxCount: 4,
     desc: 'Shoots enemy missiles out of the sky. Weak vs armor. Max 4.',
@@ -208,6 +300,15 @@ export const TOWERS: Record<TowerKind, TowerDef> = {
       { cost: 140, hp: 300, range: 150, damage: 4, cooldown: 0.27, interceptPerSec: 6 },
       { cost: 100, hp: 360, range: 165, damage: 7, cooldown: 0.23, interceptPerSec: 9 },
       { cost: 170, hp: 420, range: 180, damage: 10, cooldown: 0.2, interceptPerSec: 12 },
+    ],
+  },
+  minelayer: {
+    kind: 'minelayer', name: 'Mine Layer', short: 'MINES', projectile: 'mine',
+    desc: 'Seeds the road with mines. Crunch.',
+    levels: [
+      { cost: 170, hp: 300, range: 140, damage: 60, cooldown: 3.5, splash: 55, maxMines: 3 },
+      { cost: 130, hp: 370, range: 160, damage: 85, cooldown: 3.0, splash: 60, maxMines: 4 },
+      { cost: 210, hp: 440, range: 180, damage: 115, cooldown: 2.5, splash: 65, maxMines: 5 },
     ],
   },
   bastion: {
@@ -223,15 +324,25 @@ export const TOWERS: Record<TowerKind, TowerDef> = {
     kind: 'medic', name: 'Repair Crew', short: 'MEDIC', projectile: 'aura',
     desc: 'Patches up nearby towers while the shells fly.',
     levels: [
-      { cost: 130, hp: 320, range: 140, damage: 0, cooldown: 99, heal: 7 },
-      { cost: 100, hp: 400, range: 155, damage: 0, cooldown: 99, heal: 10 },
-      { cost: 160, hp: 480, range: 170, damage: 0, cooldown: 99, heal: 14 },
+      { cost: 130, hp: 320, range: 210, damage: 0, cooldown: 99, heal: 7 },
+      { cost: 100, hp: 400, range: 240, damage: 0, cooldown: 99, heal: 10 },
+      { cost: 160, hp: 480, range: 270, damage: 0, cooldown: 99, heal: 14 },
+    ],
+  },
+  citadel: {
+    kind: 'citadel', name: 'CITADEL', short: 'CITADEL', projectile: 'laser',
+    desc: 'The kitchen sink: a slow field, twin lasers, and missile volleys.',
+    levels: [
+      { cost: 550, hp: 800, range: 220, damage: 15, cooldown: 2.5, volley: 3, dps: 25, slowPct: 0.25 },
+      { cost: 400, hp: 1000, range: 240, damage: 20, cooldown: 2.3, volley: 3, dps: 36, slowPct: 0.3 },
+      { cost: 650, hp: 1200, range: 260, damage: 26, cooldown: 2.1, volley: 4, dps: 50, slowPct: 0.35 },
     ],
   },
 };
 
 export const TOWER_ORDER: TowerKind[] = [
-  'gun', 'swarm', 'arc', 'railgun', 'emp', 'bertha', 'hive', 'ciws', 'bastion', 'medic',
+  'gun', 'swarm', 'sprayer', 'arc', 'railgun', 'lockon', 'emp', 'cryo',
+  'bertha', 'hive', 'garage', 'ciws', 'minelayer', 'bastion', 'medic', 'citadel',
 ];
 
 // upgraded towers are bigger targets: bonus damage taken from tank fire per level

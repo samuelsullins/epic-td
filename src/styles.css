@@ -191,6 +191,15 @@ html, body, #root {
 }
 .queue-chip:active { background: var(--red-wash); transform: scale(0.94); }
 .queue-chip { position: relative; }
+.queue-chip .chip-prey {
+  position: absolute;
+  bottom: -7px; right: -7px;
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  width: 19px; height: 19px;
+  display: flex; align-items: center; justify-content: center;
+}
 .queue-chip .chip-count {
   position: absolute;
   top: -7px; right: -7px;
